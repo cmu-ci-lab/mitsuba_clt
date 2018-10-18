@@ -159,7 +159,8 @@ MTS_NAMESPACE_BEGIN
 
         }
 
-        /// Helper function that samples a direction from the environment map
+        /// Helper function that resamples the sampling position on the projector 
+        /// with importance sampling over the texture to be projected
         Point2 internalSampleDirection(Point2 sample, Spectrum &value, Float &pdf) const {
             /* Sample a discrete pixel position */
             uint32_t row = sampleReuse(m_cdfRows, m_size.y, sample.y),
@@ -179,6 +180,7 @@ MTS_NAMESPACE_BEGIN
             return pos;
         }
 
+        /// Helper function that evaluates the color at the resampled position 
         Spectrum internalEvalDirection(const Vector &d) const{
             Float cosTheta = Frame::cosTheta(d);
 
@@ -407,8 +409,6 @@ MTS_NAMESPACE_BEGIN
             const Transform &trafo = m_worldTransform->eval(ray.time);
             ray.setOrigin(trafo.transformAffine(Point(0.0f)));
             ray.setDirection(trafo(d));
-            std::string str = m_mipmap->evalTexel(0,math::floorToInt(uv.x),math::floorToInt(uv.y)).toString() + " " + uv.toString();
-            std::cout<<str<<endl;
             return Spectrum(m_scale * m_mipmap->evalTexel(0,math::floorToInt(uv.x * m_resolution.x),
                                                           math::floorToInt(uv.y * m_resolution.y)));
         }
