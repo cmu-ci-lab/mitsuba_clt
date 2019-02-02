@@ -39,6 +39,79 @@ An additional parameter "filename(string)" is added to both coded cameras compar
 
 ### "filename" parameter is required for all extended features, so please make sure to always include it scene files for using projectors or coded cameras. 
 
+### Light Transport Probing
+Three kinds of probing "identity", "row" and "column" are available and they **work only when using bdpt integrator**.
+
+**Identity Probing**: camera's pixel whose image plane index is (i,j) would sample light from only one pixel(i+a,j+b) that has certain displacement(a,b) from the camera pixel position on the projector.
+
+To use identity probing, you must contain one perspective projector and one perspective camera in the scene. Also, you need to set in integrator the type of probing to identity as below:
+```
+<integrator type="bdpt">
+    <boolean name="lightImage" value="false"/>
+    <string name="type" value="identity"/>
+</integrator>
+```
+The lightImage also needs to be turned off, since we make use of perspective projector.
+The displacement of pixels sampled from a projector is by default 0 in both x and y dimension of the projector's image plane. However, you can set the displacement of sampled pixels on perspective projector as below:
+```
+<emitter type="perspectiveprojector">
+    <float name="farClip" value="2800"/>
+    <float name="nearClip" value="10"/>
+    ...
+    <integer name="rowDisplacement" value="VALUEYOUINTENDED"/>
+    <integer name="colDisplacement" value="VALUEYOUINTENDED"/>
+</emitter>
+```
+
+**Row Probing**: camera's pixel whose image plane index is (i,j) would sample light from only pixels on row i+a where a is the displacement from the camera pixel's row on the projector.
+
+Similar to the usage of identity probing, when using row probing, you must contain one perspective projector and one perspective camera in the scene. Also, you need to set in integrator the type of probing to row as below:
+```
+<integrator type="bdpt">
+    <boolean name="lightImage" value="false"/>
+    <string name="type" value="row"/>
+</integrator>
+```
+The lightImage also needs to be turned off, since we make use of perspective projector.
+The displacement of row sampled from a projector is by default 0 in the projector's image plane. However, you can set the displacement of rows on perspective projector as below:
+```
+<emitter type="perspectiveprojector">
+    <float name="farClip" value="2800"/>
+    <float name="nearClip" value="10"/>
+    ...
+    <integer name="rowDisplacement" value="VALUEYOUINTENDED"/>
+</emitter>
+```
+
+**Column Probing**: camera's pixel whose image plane index is (i,j) would sample light from only pixels on row j+b where b is the displacement from the camera pixel's column on the projector's image plane.
+
+Similar to the usage of identity and row probing, when using column probing, you must contain one perspective projector and one perspective camera in the scene. Also, you need to set in integrator the type of probing to column as below:
+```
+<integrator type="bdpt">
+    <boolean name="lightImage" value="false"/>
+    <string name="type" value="column"/>
+</integrator>
+```
+The lightImage also needs to be turned off, since we make use of perspective projector.
+The displacement of column sampled from a projector is by default 0 in the projector's image plane. However, you can set the displacement of columns on perspective projector as below:
+```
+<emitter type="perspectiveprojector">
+    <float name="farClip" value="2800"/>
+    <float name="nearClip" value="10"/>
+    ...
+    <integer name="colDisplacement" value="VALUEYOUINTENDED"/>
+</emitter>
+```
+
+### Disparity Camera ###
+Disparity Camera renders an image that shows the difference each pixel's index on the image plane and its sampled projector's pixel's index. Speficially, the r channel of the image shows the displacement of projector pixel's column index from the camera pixel's column index and the g channel of the image shows the displacement of projector pixel's row index from the camera pixel's row index.
+
+To use disparity camera, you must contain one perspective projector and one perspective camera in the scene. Also, you need to set in integrator's type parameter to disparity as below:
+```
+<integrator type="bdpt">
+    <string name="type" value="disparity"/>
+</integrator>
+```
 ## Authors
 
 The project is derived from the [Mitsuba renderer](https://www.mitsuba-renderer.org/), written by Wenzel Jakob et al. See the Mitsuba website for a full list of contributors.
