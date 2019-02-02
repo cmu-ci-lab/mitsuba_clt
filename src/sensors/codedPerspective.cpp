@@ -1,3 +1,7 @@
+//
+// Created by Jiatian Sun on 2018/8/5.
+//
+
 #include <mitsuba/render/sensor.h>
 #include <mitsuba/render/medium.h>
 #include <mitsuba/core/track.h>
@@ -5,7 +9,7 @@
 
 MTS_NAMESPACE_BEGIN
 
-/*!\plugin{codedPerspective}{Coded Perspective pinhole camera}
+/*!\plugin{perspective}{Perspective pinhole camera}
  * \order{1}
  * \parameters{
  *     \parameter{toWorld}{\Transform\Or\Animation}{
@@ -53,13 +57,14 @@ MTS_NAMESPACE_BEGIN
  *         planes.\default{\code{near\code}-\code{Clip=1e-2} (i.e.
  *         \code{0.01}) and {\code{farClip=1e4} (i.e. \code{10000})}}
  *     }
- *     \parameter{filename}{\String}{
- *       Filename of the coded camera mask image to be loaded;
- *       must be in latitude-longitude format.
- *     }
+ * }
+ * \renderings{
+ * \rendering{The material test ball viewed through a perspective pinhole
+ * camera. Everything is in sharp focus.}{sensor_perspective}
+ * \medrendering{A rendering of the Cornell box}{sensor_perspective_2}
  * }
  *
- * This plugin implements a simple idealizied coded perspective camera model, which
+ * This plugin implements a simple idealizied perspective camera model, which
  * has an infinitely small aperture. This creates an infinite depth of field,
  * i.e. no optical blurring occurs. The camera is can be specified to move during
  * an exposure, hence temporal blur is still possible.
@@ -72,19 +77,15 @@ MTS_NAMESPACE_BEGIN
  * Alternatively, it is also possible to specify a field of view in degrees
  * along a given axis (see the \code{fov} and \code{fovAxis} parameters).
  *
- * As for the camera's mask, the camera scales the input image to fit its film size
- * and consider the scaled image as a mask over the aperture.
- *
  * The exact camera position and orientation is most easily expressed using the
  * \code{lookat} tag, i.e.:
  * \begin{xml}
- * <sensor type="codedPerspective">
+ * <sensor type="perspective">
  *     <transform name="toWorld">
  *         <!-- Move and rotate the camera so that looks from (1, 1, 1) to (1, 2, 1)
  *              and the direction (0, 0, 1) points "up" in the output image -->
  *         <lookat origin="1, 1, 1" target="1, 2, 1" up="0, 0, 1"/>
  *     </transform>
- *     </string name="filename" value="image.png" />
  * </sensor>
  * \end{xml}
  */
@@ -441,7 +442,6 @@ public:
         dRec.measure = EDiscrete;
 
         Point2 uv(dRec.uv.x * m_invResolution.x * m_mapRes.x, dRec.uv.y * m_invResolution.y * m_mapRes.y);
-
         return Spectrum(importance(localD) * invDist * invDist *
                 m_mipmap->evalTexel(0,math::floorToInt(uv.x),
                 math::floorToInt(uv.y)));

@@ -121,13 +121,13 @@ public:
 	 * \return \c false if one of the sample values was \a invalid, e.g.
 	 *    NaN or negative. A warning is also printed in this case
 	 */
-	FINLINE bool put(const Point2 &pos, const Spectrum &spec, Float alpha) {
+	FINLINE bool put(const Point2 &pos, const Spectrum &spec, Float alpha, bool isProbe = false) {
 		Float temp[SPECTRUM_SAMPLES + 2];
 		for (int i=0; i<SPECTRUM_SAMPLES; ++i)
 			temp[i] = spec[i];
 		temp[SPECTRUM_SAMPLES] = alpha;
 		temp[SPECTRUM_SAMPLES + 1] = 1.0f;
-		return put(pos, temp);
+		return put(pos, temp, isProbe);
 	}
 
 	/**
@@ -141,15 +141,14 @@ public:
 	 * \return \c false if one of the sample values was \a invalid, e.g.
 	 *    NaN or negative. A warning is also printed in this case
 	 */
-	FINLINE bool put(const Point2 &_pos, const Float *value) {
+	FINLINE bool put(const Point2 &_pos, const Float *value, const bool isProbe = false) {
 		const int channels = m_bitmap->getChannelCount();
 
 		/* Check if all sample values are valid */
 		for (int i=0; i<channels; ++i) {
-			if (EXPECT_NOT_TAKEN((!std::isfinite(value[i]) || value[i] < 0) && m_warn))
+			if (EXPECT_NOT_TAKEN((!std::isfinite(value[i]) || (value[i] < 0 && !isProbe)) && m_warn))
 				goto bad_sample;
 		}
-
 		{
 			const Float filterRadius = m_filter->getRadius();
 			const Vector2i &size = m_bitmap->getSize();

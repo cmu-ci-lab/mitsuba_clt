@@ -964,7 +964,6 @@ Spectrum Scene::sampleEmitterPosition(
 	Float emPdf;
 	size_t index = m_emitterPDF.sampleReuse(sample.x, emPdf);
 	const Emitter *emitter = m_emitters[index].get();
-
 	Spectrum value = emitter->samplePosition(pRec, sample);
 
 	pRec.object = emitter;
@@ -972,6 +971,24 @@ Spectrum Scene::sampleEmitterPosition(
 
 	return value / emPdf;
 }
+
+	Spectrum Scene::sampleProjectiveEmitterPosition(
+			PositionSamplingRecord &pRec,
+			const Point2 &_sample, const Point2 *extra) const {
+		Point2 sample(_sample);
+
+		/* Randomly pick an emitter */
+		Float emPdf;
+		size_t index = m_emitterPDF.sampleReuse(sample.x, emPdf);
+		const Emitter *emitter = m_emitters[index].get();
+
+		Spectrum value = emitter->samplePosition(pRec, sample, extra);
+
+		pRec.object = emitter;
+		pRec.pdf *= emPdf;
+
+		return value / emPdf;
+	}
 
 Float Scene::pdfEmitterPosition(const PositionSamplingRecord &pRec) const {
 	const Emitter *emitter = static_cast<const Emitter *>(pRec.object);

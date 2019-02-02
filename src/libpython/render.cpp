@@ -788,7 +788,7 @@ void export_render() {
 		.def("fbm", &Noise::fbm);
 
 	void (ImageBlock::*imageBlock_put1)(const ImageBlock *) = &ImageBlock::put;
-	bool (ImageBlock::*imageBlock_put2)(const Point2 &, const Spectrum &, Float) = &ImageBlock::put;
+	bool (ImageBlock::*imageBlock_put2)(const Point2 &, const Spectrum &, Float, bool) = &ImageBlock::put;
 	Bitmap *(ImageBlock::*imageBlock_getBitmap)() = &ImageBlock::getBitmap;
 
 	BP_CLASS(ImageBlock, WorkResult, (bp::init<Bitmap::EPixelFormat, const Vector2i &, bp::optional<const ReconstructionFilter *, int, bool> >()))

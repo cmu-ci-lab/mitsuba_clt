@@ -21,6 +21,7 @@
 #define __MITSUBA_BIDIR_VERTEX_H_
 
 #include <mitsuba/bidir/common.h>
+#include <mitsuba/bidir/probe.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -212,6 +213,8 @@ struct MTS_EXPORT_BIDIR PathVertex {
 	 */
 	uint8_t data[EDataSize];
 
+	Point2 uv;
+
 	//! @}
 	/* ==================================================================== */
 
@@ -273,7 +276,7 @@ struct MTS_EXPORT_BIDIR PathVertex {
 		const PathVertex *pred, const PathEdge *predEdge,
 		PathEdge *succEdge, PathVertex *succ,
 		ETransportMode mode, bool russianRoulette = false,
-		Spectrum *throughput = NULL);
+		Spectrum *throughput = NULL, uint32_t probeType = Probe::ENORMAL);
 
 	/**
 	 * \brief \a Direct sampling: given the current vertex as a reference
@@ -308,7 +311,42 @@ struct MTS_EXPORT_BIDIR PathVertex {
 	 */
 	Spectrum sampleDirect(const Scene *scene, Sampler *sampler,
 		PathVertex *endpoint, PathEdge *edge, PathVertex *sample,
-		ETransportMode mode) const;
+		ETransportMode mode, uint32_t probeType = Probe::ENORMAL) const;
+
+		/**
+	 * \brief \a Direct sampling: given the current vertex as a reference
+	 * sample an emitter (or sensor) position that has a nonzero emission
+	 * (or response) towards it.
+	 *
+	 * This can be seen as a generalization of direct illumination sampling
+	 * that can be used for both emitter and sensor endpoints.
+	 *
+	 * Ideally, the implementation should importance sample the product of
+	 * the emission or response profile and the geometry term between the
+	 * reference point and the sampled position. In practice, one of these
+	 * usually has to be sacrificed.
+	 *
+	 * \param scene
+	 *     Pointer to the underlying scene
+	 * \param sampler
+	 *     Pointer to a sample generator
+	 * \param endpoint
+	 *     Unused vertex data structure, which will be configured as
+	 *     the endpoint associated with \c sample.
+	 * \param edge
+	 *     Unused edge data structure, which will be configured
+	 *     as the edge between \c endpoint and \c sample.
+	 * \param sample
+	 *     Unused vertex data structure, which will hold the
+	 *     sampled sensor or emitter position
+	 * \param mode
+	 *     Specifies whether radiance or importance is being transported
+	 * \return The emitted radiance or importance divided by the
+	 *     sample probability per unit area per unit solid angle.
+	 */
+		Spectrum sampleDirect(const Scene *scene, Sampler *sampler,
+													PathVertex *endpoint, PathEdge *edge, PathVertex *sample,
+													ETransportMode mode, const Point2 &PixelPosition, uint32_t probeType = Probe::ENORMAL) const;
 
 	/**
 	 * \brief Sample the first vertices on a sensor subpath such that
@@ -346,7 +384,21 @@ struct MTS_EXPORT_BIDIR PathVertex {
 	 *    were successfully filled)
 	 */
 	int sampleSensor(const Scene *scene, Sampler *sampler, const Point2i &pixelPosition,
-		PathEdge *e0, PathVertex *v1, PathEdge *e1, PathVertex *v2);
+		PathEdge *e0, PathVertex *v1, PathEdge *e1, PathVertex *v2, uint32_t probeType = Probe::ENORMAL);
+
+	/**
+	 * Added to support probing
+	 * @param scene
+	 * @param sampler
+	 * @param pixelPosition
+	 * @param e0
+	 * @param v1
+	 * @param e1
+	 * @param v2
+	 * @return
+	 */
+	int sampleEmitterWS(const Scene *scene, Sampler *sampler, const Point2i &pixelPosition,
+		PathEdge *e0, PathVertex *v1, PathEdge *e1, PathVertex *v2, Probe::EProbeType probeType);
 
 	/**
 	 * \brief Create a perturbed successor vertex and edge
@@ -476,7 +528,7 @@ struct MTS_EXPORT_BIDIR PathVertex {
 	 * \return The contribution weighting factor
 	 */
 	Spectrum eval(const Scene *scene, const PathVertex *pred,
-		const PathVertex *succ, ETransportMode mode, EMeasure measure = EArea) const;
+		const PathVertex *succ, ETransportMode mode, EMeasure measure = EArea,	Probe::EProbeType probe = Probe::ENORMAL) const;
 
 	/**
 	 * \brief Compute the density of a successor node

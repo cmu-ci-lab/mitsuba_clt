@@ -18,10 +18,11 @@
 #include <mitsuba/hw/gpuprogram.h>
 #include <mitsuba/hw/gputexture.h>
 #include <math.h>
+#include <mitsuba/bidir/probe.h>
 
 MTS_NAMESPACE_BEGIN
 
-/*!\plugin{perspectiveprojector}{Perspective Projector}
+/*!\plugin{perspective}{Perspective pinhole camera}
  * \order{1}
  * \parameters{
  *     \parameter{toWorld}{\Transform\Or\Animation}{
@@ -69,38 +70,35 @@ MTS_NAMESPACE_BEGIN
  *         planes.\default{\code{near\code}-\code{Clip=1e-2} (i.e.
  *         \code{0.01}) and {\code{farClip=1e4} (i.e. \code{10000})}}
  *     }
- *     \parameter{filename}{\String}{
- *       Filename of the radiance-valued input image to be loaded;
- *       must be in latitude-longitude format(the image to be
- *       projected into the scene).
- *     }
- *     \parameter{scale}{\Float}{
- *      Specifies the amount of scaling to the emitter's brightness
- *     }
+ * }
+ * \renderings{
+ * \rendering{The material test ball viewed through a perspective pinhole
+ * camera. Everything is in sharp focus.}{sensor_perspective}
+ * \medrendering{A rendering of the Cornell box}{sensor_perspective_2}
  * }
  *
- * This plugin implements a simple idealizied coded perspective emitter model, which
+ * This plugin implements a simple idealizied perspective camera model, which
  * has an infinitely small aperture. This creates an infinite depth of field,
- * i.e. no optical blurring occurs.
+ * i.e. no optical blurring occurs. The camera is can be specified to move during
+ * an exposure, hence temporal blur is still possible.
  *
- * So far, the emitter requires an input image whose resolution and color specifies
- * radiance value of aperture and by default, the emitter has a focal length of 35mm.
- * Alternatively, it is also possible to specify a field of projection in degrees
- * along a given axis (see the \code{fov} and \code{fovAxis} parameters). To scale
- * the brightness of the source conveniently, you can specify the parameter \code{scale},
- * which is by default 1.
+ * By default, the camera's field of view is specified using a 35mm film
+ * equivalent focal length, which is first converted into a diagonal field
+ * of view and subsequently applied to the camera. This assumes that
+ * the film's aspect ratio matches that of 35mm film (1.5:1), though the
+ * parameter still behaves intuitively when this is not the case.
+ * Alternatively, it is also possible to specify a field of view in degrees
+ * along a given axis (see the \code{fov} and \code{fovAxis} parameters).
  *
  * The exact camera position and orientation is most easily expressed using the
  * \code{lookat} tag, i.e.:
  * \begin{xml}
- * <sensor type="codedPerspective">
+ * <sensor type="perspective">
  *     <transform name="toWorld">
  *         <!-- Move and rotate the camera so that looks from (1, 1, 1) to (1, 2, 1)
  *              and the direction (0, 0, 1) points "up" in the output image -->
  *         <lookat origin="1, 1, 1" target="1, 2, 1" up="0, 0, 1"/>
  *     </transform>
- *     </string name="filename" value="image.png" />
- *     <float name="scale" value="10"/>
  * </sensor>
  * \end{xml}
  */
@@ -113,6 +111,8 @@ MTS_NAMESPACE_BEGIN
             m_type |=  EDeltaPosition | EPerspectiveEmitter | EOnSurface | EDirectionSampleMapsToPixels;
 
             m_scale = props.getFloat("scale", 1.0f);
+            m_rowTransform = props.getInteger("rowTransform", 0);
+            m_colTransform = props.getInteger("colTransform", 0);
             if (props.getTransform("toWorld", Transform()).hasScale())
                 Log(EError, "Scale factors in the emitter-to-world "
                         "transformation are not allowed!");
@@ -121,12 +121,16 @@ MTS_NAMESPACE_BEGIN
         PerspectiveEmitterImpl(Stream *stream, InstanceManager *manager)
                 : PerspectiveEmitter(stream, manager) {
             m_scale = stream->readFloat();
+            m_rowTransform = stream->readInt();
+            m_colTransform = stream->readInt();
             configure();
         }
 
         void serialize(Stream *stream, InstanceManager *manager) const {
             PerspectiveEmitter::serialize(stream, manager);
             stream->writeFloat(m_scale);
+            stream->writeInt(m_rowTransform);
+            stream->writeInt(m_colTransform);
         }
 
         void configure() {
@@ -159,8 +163,7 @@ MTS_NAMESPACE_BEGIN
 
         }
 
-        /// Helper function that resamples the sampling position on the projector 
-        /// with importance sampling over the texture to be projected
+        /// Helper function that samples a direction from the environment map
         Point2 internalSampleDirection(Point2 sample, Spectrum &value, Float &pdf) const {
             /* Sample a discrete pixel position */
             uint32_t row = sampleReuse(m_cdfRows, m_size.y, sample.y),
@@ -174,13 +177,12 @@ MTS_NAMESPACE_BEGIN
             int xPos = math::floorToInt(pos.x), yPos = math::floorToInt(pos.y);
 
             value = m_mipmap->evalTexel(0, xPos, yPos);
-            pdf = value.getLuminance() * m_rowWeights[math::clamp(yPos,   0, m_size.y-1)]  * m_normalSpectrum;
+            pdf = value.getLuminance() * m_rowWeights[math::clamp(yPos, 0, m_size.y-1)]  * m_normalSpectrum;
 
             pos.x = pos.x/m_size.x; pos.y = pos.y/m_size.y;
             return pos;
         }
 
-        /// Helper function that evaluates the color at the resampled position 
         Spectrum internalEvalDirection(const Vector &d) const{
             Float cosTheta = Frame::cosTheta(d);
 
@@ -313,11 +315,11 @@ MTS_NAMESPACE_BEGIN
             pRec.pdf = 1.0f;
             pRec.measure = EDiscrete;
 
-            return Spectrum(m_scale /(m_normalSpectrum * m_resolution.x * m_resolution.y));
+            return Spectrum(1.0f);
         }
 
         Spectrum evalPosition(const PositionSamplingRecord &pRec) const {
-            return Spectrum((pRec.measure == EDiscrete) ? m_scale /(m_normalSpectrum * m_resolution.x * m_resolution.y) : 0.0f);
+            return Spectrum((pRec.measure == EDiscrete) ? 1.0f : 0.0f);
         }
 
         Float pdfPosition(const PositionSamplingRecord &pRec) const {
@@ -336,9 +338,56 @@ MTS_NAMESPACE_BEGIN
                 samplePos.y = (extra->y + sample.y) * m_invResolution.y;
             }
 
+          if(pRec.probeType != Probe::ENORMAL){
+            Point2 uvSample(samplePos.x * m_resolution.x, samplePos.y * m_resolution.y);
+            int32_t xUnitTransform = m_colTransform % m_size.x;
+            int32_t  xFinalTransform = xUnitTransform < 0 ? xUnitTransform + m_size.x: xUnitTransform;
+            int32_t yUnitTransform = m_rowTransform % m_size.y;
+            int32_t  yFinalTransform = yUnitTransform < 0 ? yUnitTransform + m_size.y: yUnitTransform;
+
+            int32_t xPixelPos = (int32_t)floor(uvSample.x + xFinalTransform)% m_size.x;
+            int32_t yPixelPos = (int32_t)floor(uvSample.y + yFinalTransform) % m_size.y;
+            Float samplePosRelativeToPixelx = uvSample.x-(int32_t)floor(uvSample.x);
+            Float samplePosRelativeToPixely = uvSample.y-(int32_t)floor(uvSample.y);
+
+            samplePos = Point((xPixelPos + samplePosRelativeToPixelx) * m_invResolution.x,
+                              (yPixelPos + samplePosRelativeToPixely) * m_invResolution.y,
+                              0.0f);
+
+            pRec.uv = Point2(samplePos.x * m_resolution.x,
+                             samplePos.y * m_resolution.y);
+
+            /* Compute the corresponding position on the
+               near plane (in local camera space) */
+            Point nearP = m_sampleToCamera(samplePos);
+
+            /* Turn that into a normalized ray direction */
+            Vector d = normalize(Vector(nearP));
+            dRec.d = trafo(d);
+            dRec.measure = ESolidAngle;
+            if(pRec.probeType == Probe::ECOLUMN) {
+              dRec.pdf = (Float) m_resolution.x * m_normalization / (d.z * d.z * d.z);
+              return Spectrum(m_scale) / (Float) m_resolution.x;
+            }
+            else if(pRec.probeType == Probe::EROW){
+              dRec.pdf = (Float)m_resolution.y * m_normalization / (d.z * d.z * d.z);
+              return Spectrum(m_scale)/ (Float)m_resolution.y;
+            }
+            else if(pRec.probeType == Probe::EIDENTITY){
+              dRec.pdf = m_normalization / (d.z * d.z * d.z) * m_resolution.x * m_resolution.y;
+              return Spectrum(m_scale)/((Float)m_resolution.x * (Float)m_resolution.y);
+            }
+            else{
+              dRec.pdf = m_normalization / (d.z * d.z * d.z);
+              return Spectrum(m_scale);
+            }
+          }
+          else {
+
             /* Sample a direction from the texture map */
-            Spectrum value; Float pdf;
-            Point2 pos = internalSampleDirection(Point2(samplePos.x,samplePos.y), value, pdf);
+            Spectrum value;
+            Float pdf;
+            Point2 pos = internalSampleDirection(Point2(samplePos.x, samplePos.y), value, pdf);
 
             samplePos.x = pos.x;
             samplePos.y = pos.y;
@@ -358,11 +407,12 @@ MTS_NAMESPACE_BEGIN
             dRec.pdf = m_normalization / (d.z * d.z * d.z) * pdf;
 
             if (value.isZero() || pdf == 0)
-                return Spectrum(0.0f);
-            else{
-                return value;
+              return Spectrum(0.0f);
+            else {
+              return value * m_scale / (m_normalSpectrum * m_resolution.x * m_resolution.y);
 
             }
+          }
         }
 
         Float pdfDirection(const DirectionSamplingRecord &dRec,
@@ -372,7 +422,15 @@ MTS_NAMESPACE_BEGIN
 
             const Transform &trafo = m_worldTransform->eval(pRec.time);
 
-            return internalPdfDirection(trafo.inverse()(dRec.d));
+            uint32_t probeType = pRec.probeType;
+            if(probeType == Probe::EROW)
+              return importance(trafo.inverse()(dRec.d)) * (Float)m_resolution.y;
+            else if(probeType == Probe::EIDENTITY)
+              return importance(trafo.inverse()(dRec.d)) * ((Float)m_resolution.x * (Float)m_resolution.y);
+            else if(probeType == Probe::ECOLUMN)
+              return importance(trafo.inverse()(dRec.d)) * (Float)m_resolution.x;
+            else
+              return internalPdfDirection(trafo.inverse()(dRec.d));
         }
 
         Spectrum evalDirection(const DirectionSamplingRecord &dRec,
@@ -383,8 +441,13 @@ MTS_NAMESPACE_BEGIN
             const Transform &trafo = m_worldTransform->eval(pRec.time);
 
             Vector v = trafo.inverse()(dRec.d);
+            uint32_t probeType = pRec.probeType;
 
-            return internalEvalDirection(v);
+            if(probeType != Probe::ENORMAL)
+              return importance(v) * Spectrum(m_scale);
+            else
+              return internalEvalDirection(v) * m_scale /(m_normalSpectrum * m_resolution.x * m_resolution.y);
+
         }
 
         Spectrum sampleRay(Ray &ray, const Point2 &pixelSample,
@@ -397,7 +460,7 @@ MTS_NAMESPACE_BEGIN
                     pixelSample.x * m_invResolution.x,
                     pixelSample.y * m_invResolution.y, 0.0f));
 
-            Point2 uv(nearP.x,nearP.y);
+            Point2 uv(pixelSample.x,pixelSample.y);
 
             /* Turn that into a normalized ray direction, and
                adjust the ray interval accordingly */
@@ -409,6 +472,7 @@ MTS_NAMESPACE_BEGIN
             const Transform &trafo = m_worldTransform->eval(ray.time);
             ray.setOrigin(trafo.transformAffine(Point(0.0f)));
             ray.setDirection(trafo(d));
+
             return Spectrum(m_scale * m_mipmap->evalTexel(0,math::floorToInt(uv.x * m_resolution.x),
                                                           math::floorToInt(uv.y * m_resolution.y)));
         }
@@ -437,6 +501,19 @@ MTS_NAMESPACE_BEGIN
             dRec.uv.x *= m_resolution.x;
             dRec.uv.y *= m_resolution.y;
 
+          if((dRec.probeType==Probe::ECOLUMN) && floor(dRec.uv.x) != floor(dRec.pixelPosition.x)) {
+            dRec.pdf = 0;
+            return Spectrum(0.0f);
+          }
+          else if((dRec.probeType==Probe::EROW) && floor(dRec.uv.y) != floor(dRec.pixelPosition.y)) {
+            dRec.pdf = 0;
+            return Spectrum(0.0f);
+          }
+          else if((dRec.probeType==Probe::EIDENTITY) && (floor(dRec.uv.x) != floor(dRec.pixelPosition.x)
+                                                         || floor(dRec.uv.y) != floor(dRec.pixelPosition.y))) {
+            dRec.pdf = 0;
+            return Spectrum(0.0f);
+          }
 
             Vector localD(refP);
             Float dist = localD.length(),
@@ -450,6 +527,11 @@ MTS_NAMESPACE_BEGIN
             dRec.pdf = 1;
             dRec.measure = EDiscrete;
 
+          int32_t probeType = dRec.probeType;
+
+          if(probeType != Probe::ENORMAL)
+            return Spectrum(importance(localD) * invDist * invDist * m_scale);
+          else
             return importance(localD) * invDist * invDist * m_scale *
                    m_mipmap->evalTexel(0,math::floorToInt(dRec.uv.x),math::floorToInt(dRec.uv.y));
 

@@ -785,6 +785,30 @@ public:
 		const Point2 &sample) const;
 
 	/**
+	 * \brief Sample a position according to the emission profile
+	 * defined by the projective emitters in the scene.
+	 *
+	 * To sample the directional component, please use the
+	 * \ref Emitter::sampleDirection() method.
+	 *
+	 * \param pRec
+	 *    A position record to be populated with the sampled
+	 *    position and related information
+	 *
+	 * \param sample
+	 *    A uniformly distributed 2D vector
+	 *
+	 * \param
+	 *
+	 * \return
+	 *    An importance weight associated with the sampled position.
+	 *    This accounts for the difference in the spatial part of the
+	 *    emission profile and the density function.
+	 */
+	Spectrum sampleProjectiveEmitterPosition(PositionSamplingRecord &pRec,
+								   const Point2 &sample, const Point2* extra) const;
+
+	/**
 	 * \brief Sample a position on the main sensor of the scene.
 	 *
 	 * This function is provided here mainly for symmetry

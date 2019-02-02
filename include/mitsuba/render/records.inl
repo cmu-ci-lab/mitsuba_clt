@@ -158,11 +158,15 @@ inline DirectionSamplingRecord::DirectionSamplingRecord(const Intersection &its,
 	: d(its.toWorld(its.wi)), measure(measure) { }
 
 inline DirectSamplingRecord::DirectSamplingRecord(const Intersection &refIts)
-	: PositionSamplingRecord(refIts.time), ref(refIts.p), refN(0.0f) {
-	if ((refIts.shape->getBSDF()->getType() & (BSDF::ETransmission | BSDF::EBackSide)) == 0)
-		refN = refIts.shFrame.n;
-}
-
+					: PositionSamplingRecord(refIts.time), ref(refIts.p), refN(0.0f) {
+		if ((refIts.shape->getBSDF()->getType() & (BSDF::ETransmission | BSDF::EBackSide)) == 0)
+			refN = refIts.shFrame.n;
+	}
+inline DirectSamplingRecord::DirectSamplingRecord(const Intersection &refIts, const Point2 &samplePosition)
+					: PositionSamplingRecord(refIts.time), ref(refIts.p), refN(0.0f), pixelPosition(samplePosition) {
+		if ((refIts.shape->getBSDF()->getType() & (BSDF::ETransmission | BSDF::EBackSide)) == 0)
+			refN = refIts.shFrame.n;
+	}
 inline DirectSamplingRecord::DirectSamplingRecord(const MediumSamplingRecord &refM)
 	: PositionSamplingRecord(refM.time), ref(refM.p), refN(0.0f) {
 }

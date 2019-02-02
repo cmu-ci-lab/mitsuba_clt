@@ -63,8 +63,9 @@ public:
 	}
 #endif
 
-	inline void putSample(const Point2 &sample, const Spectrum &spec) {
-		m_block->put(sample, spec, 1.0f);
+	inline void putSample(const Point2 &sample, const Spectrum &spec, bool isProbe = false) {
+//		std::cout<<"spec "<<spec.toString()<<endl;
+		m_block->put(sample, spec, 1.0f, isProbe);
 	}
 
 	inline void putLightSample(const Point2 &sample, const Spectrum &spec) {

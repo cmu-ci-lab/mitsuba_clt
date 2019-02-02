@@ -11,5 +11,7 @@ plugins += env.SharedLibrary('orthographic', ['orthographic.cpp'])
 plugins += env.SharedLibrary('codedOrthographic', ['codedOrthographic.cpp'])
 plugins += env.SharedLibrary('telecentric', ['telecentric.cpp'])
 plugins += env.SharedLibrary('spherical', ['spherical.cpp'])
+plugins += env.SharedLibrary('disparity', ['disparity.cpp'])
+plugins += env.SharedLibrary('perspectiveCol', ['perspectiveCol.cpp'])
 
 Export('plugins')

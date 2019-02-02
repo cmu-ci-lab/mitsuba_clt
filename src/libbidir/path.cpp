@@ -197,6 +197,123 @@ std::pair<int, int> Path::alternatingRandomWalkFromPixel(const Scene *scene, Sam
 	return std::make_pair(s, t);
 }
 
+	std::pair<int, int> Path::alternatingRandomWalkforProbing(const Scene *scene, Sampler *sampler,
+															 Path &emitterPath, int nEmitterSteps, Path &sensorPath, int nSensorSteps,
+															 const Point2i &pixelPosition, int rrStart, MemoryPool &pool,
+															 Probe::EProbeType probeType) {
+        //BDAssert(type of sensor and emitter to be correspondent);
+        /* Determine the relevant edges and vertices to start the random walk */
+		PathVertex *curVertexS  = emitterPath.vertex(0),
+				*curVertexT  = sensorPath.vertex(0),
+				*predVertexS = NULL, *predVertexT = NULL;
+		PathEdge   *predEdgeS  = NULL, *predEdgeT = NULL;
+
+		PathVertex *v1 = pool.allocVertex(), *v2 = pool.allocVertex();
+		PathEdge *e0 = pool.allocEdge(), *e1 = pool.allocEdge();
+
+    PathVertex *v11 = pool.allocVertex(), *v22 = pool.allocVertex();
+    PathEdge *e00 = pool.allocEdge(), *e11 = pool.allocEdge();
+
+		/* Use a special sampling routine for the first two sensor vertices so that
+           the resulting subpath passes through the specified pixel position */
+		int t = curVertexT->sampleSensor(scene, sampler, pixelPosition, e0, v1, e1, v2, probeType);
+//        std::cout<<sensorPos.toString()<<endl;
+        //only works when resampling is not happening
+        /*probing type*/
+//        int s = curVertexS->sampleEmitterWS(scene, sampler, pixelPosition, e00, v11, e11, v22,type);
+    int s = curVertexS->sampleEmitterWS(scene, sampler, pixelPosition, e00, v11, e11, v22, probeType);
+//        std::cout<<pixelPosition<<endl;
+
+		if (t >= 1) {
+			sensorPath.append(e0, v1);
+		} else {
+			pool.release(e0);
+			pool.release(v1);
+		}
+
+		if (t == 2) {
+            sensorPath.append(e1, v2);
+            predVertexT = v1;
+            curVertexT = v2;
+            predEdgeT = e1;
+
+		} else {
+            pool.release(e1);
+            pool.release(v2);
+
+            curVertexT = NULL;
+		}
+
+        if (s >= 1) {
+            emitterPath.append(e00, v11);
+        } else {
+            pool.release(e00);
+            pool.release(v11);
+        }
+
+        if (s == 2) {
+            emitterPath.append(e11, v22);
+            predVertexS = v11;
+            curVertexS = v22;
+            predEdgeS = e11;
+
+        } else {
+            pool.release(e11);
+            pool.release(v22);
+
+            curVertexS = NULL;
+        }
+
+		Spectrum throughputS(1.0f), throughputT(1.0f);
+
+		do {
+			if (curVertexT && (t < nSensorSteps || nSensorSteps == -1)) {
+				PathVertex *succVertexT = pool.allocVertex();
+				PathEdge *succEdgeT = pool.allocEdge();
+
+				if (curVertexT->sampleNext(scene, sampler, predVertexT,
+										   predEdgeT, succEdgeT, succVertexT, ERadiance,
+										   rrStart != -1 && t >= rrStart, &throughputT, probeType)) {
+//                    std::cout<<(curVertexT->measure)<<endl;
+					sensorPath.append(succEdgeT, succVertexT);
+					predVertexT = curVertexT;
+					curVertexT = succVertexT;
+					predEdgeT = succEdgeT;
+					t++;
+				} else {
+					pool.release(succVertexT);
+					pool.release(succEdgeT);
+					curVertexT = NULL;
+				}
+			} else {
+				curVertexT = NULL;
+			}
+
+			if (curVertexS && (s < nEmitterSteps || nEmitterSteps == -1)) {
+				PathVertex *succVertexS = pool.allocVertex();
+				PathEdge *succEdgeS = pool.allocEdge();
+
+				if (curVertexS->sampleNext(scene, sampler, predVertexS,
+										   predEdgeS,succEdgeS, succVertexS, EImportance,
+										   rrStart != -1 && s >= rrStart, &throughputS, probeType)) {
+					emitterPath.append(succEdgeS, succVertexS);
+					predVertexS = curVertexS;
+					curVertexS = succVertexS;
+					predEdgeS = succEdgeS;
+					s++;
+				} else {
+					pool.release(succVertexS);
+					pool.release(succEdgeS);
+					curVertexS = NULL;
+				}
+			} else {
+				curVertexS = NULL;
+			}
+		} while (curVertexS || curVertexT);
+
+		return std::make_pair(s, t);
+	}
+
 void Path::reverse() {
 	std::reverse(m_vertices.begin(), m_vertices.end());
 	std::reverse(m_edges.begin(), m_edges.end());
@@ -265,7 +382,7 @@ bool Path::operator==(const Path &path) const {
 
 Float Path::miWeight(const Scene *scene, const Path &emitterSubpath,
 		const PathEdge *connectionEdge, const Path &sensorSubpath,
-		int s, int t, bool sampleDirect, bool lightImage) {
+		int s, int t, bool sampleDirect, bool lightImage, Probe::EProbeType probeType) {
 	int k = s+t+1, n = k+1;
 
 	const PathVertex

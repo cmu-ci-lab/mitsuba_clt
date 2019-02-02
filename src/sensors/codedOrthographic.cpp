@@ -1,3 +1,7 @@
+//
+// Created by Jiatian Sun on 2018/8/5.
+//
+
 #include <mitsuba/render/sensor.h>
 #include <mitsuba/render/medium.h>
 #include <mitsuba/core/track.h>
@@ -6,7 +10,7 @@
 
 MTS_NAMESPACE_BEGIN
 
-/*!\plugin{codedOrthographic}{Codede orthographic camera}
+/*!\plugin{orthographic}{Orthographic camera}
  * \order{3}
  * \parameters{
  *     \parameter{toWorld}{\Transform\Or\Animation}{
@@ -23,23 +27,22 @@ MTS_NAMESPACE_BEGIN
  *         planes.\default{\code{near\code}-\code{Clip=1e-2} (i.e.
  *         \code{0.01}) and {\code{farClip=1e4} (i.e. \code{10000})}}
  *     }
- *     \parameter{filename}{\String}{
- *       Filename of the coded camera mask image to be loaded;
- *       must be in latitude-longitude format.
- *     }
+ * }
+ * \renderings{
+ * \rendering{The material test ball viewed through an orthographic camera.
+ * Note the complete lack of perspective.}{sensor_orthographic}
+ * \medrendering{A rendering of the Cornell box}{sensor_orthographic_2}
  * }
  *
  * This plugin implements a simple orthographic camera, i.e. a sensor
  * based on an orthographic projection without any form of perspective.
  * It can be thought of as a planar sensor that measures the radiance
  * along its normal direction. By default, this is the region $[-1, 1]^2$ inside
- * the XY-plane facing along the positive Z direction. The camera's mask is
- * created by scaling the input image to its film size and currently there is
- * no default value for the mask so please provide a white mask for default usage.
- * Transformed versions can be instantiated e.g. as follows:
+ * the XY-plane facing along the positive Z direction. Transformed versions
+ * can be instantiated e.g. as follows:
  *
  * \begin{xml}
- * <sensor type="codedOrthographic">
+ * <sensor type="orthographic">
  *     <transform name="toWorld">
  *         <!-- Resize the sensor plane to 20x20 world space units -->
  *         <scale x="10" y="10"/>
@@ -48,7 +51,6 @@ MTS_NAMESPACE_BEGIN
  *              (1, 1, 1) and faces direction (0, 1, 0) -->
  *         <lookat origin="1, 1, 1" target="1, 2, 1" up="0, 0, 1"/>
  *     </transform>
- *     </string name="filename" value="image.png" />
  * </sensor>
  * \end{xml}
  */
