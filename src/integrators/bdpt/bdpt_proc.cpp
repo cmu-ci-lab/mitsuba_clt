@@ -78,15 +78,6 @@ public:
 			enableFPExceptions();
         #endif
 
-//		const ref_vector<Emitter> &emitters = m_scene->getEmitters();
-//		for(int i =0;i<emitters.size();i++){
-//			const Emitter *emitter = emitters[0].get();
-//			if (emitter->getType() & (Emitter::EOrthographicEmitter | Emitter::EPerspectiveEmitter)
-//				&& m_config.lightImage){
-//				throw std::invalid_argument( "Set lightImage to be false in the integrator for projectors to work" );
-//			}
-//		}
-
 		Path emitterSubpath;
 		Path sensorSubpath;
 
@@ -120,7 +111,7 @@ public:
 
 				/* Perform a random walk using alternating steps on each path */
 				Probe::EProbeType type;
-        if(m_config.type.compare("id")==0) {
+        if(m_config.type.compare("identity")==0) {
           type =  Probe::EIDENTITY;
 					Path::alternatingRandomWalkforProbing(m_scene, m_sampler,
 														  emitterSubpath, emitterDepth, sensorSubpath,

@@ -111,8 +111,8 @@ MTS_NAMESPACE_BEGIN
             m_type |=  EDeltaPosition | EPerspectiveEmitter | EOnSurface | EDirectionSampleMapsToPixels;
 
             m_scale = props.getFloat("scale", 1.0f);
-            m_rowTransform = props.getInteger("rowTransform", 0);
-            m_colTransform = props.getInteger("colTransform", 0);
+            m_rowTransform = props.getInteger("rowDisplacement", 0);
+            m_colTransform = props.getInteger("colDisplacement", 0);
             if (props.getTransform("toWorld", Transform()).hasScale())
                 Log(EError, "Scale factors in the emitter-to-world "
                         "transformation are not allowed!");
@@ -340,9 +340,9 @@ MTS_NAMESPACE_BEGIN
 
           if(pRec.probeType != Probe::ENORMAL){
             Point2 uvSample(samplePos.x * m_resolution.x, samplePos.y * m_resolution.y);
-            int32_t xUnitTransform = m_colTransform % m_size.x;
-            int32_t  xFinalTransform = xUnitTransform < 0 ? xUnitTransform + m_size.x: xUnitTransform;
-            int32_t yUnitTransform = m_rowTransform % m_size.y;
+            int32_t xUnitTransform = pRec.probeType == Probe::EROW ? 0: m_colTransform % m_size.x;
+            int32_t xFinalTransform = xUnitTransform < 0 ? xUnitTransform + m_size.x: xUnitTransform;
+            int32_t yUnitTransform = pRec.probeType == Probe::ECOLUMN ? 0: m_rowTransform % m_size.y;
             int32_t  yFinalTransform = yUnitTransform < 0 ? yUnitTransform + m_size.y: yUnitTransform;
 
             int32_t xPixelPos = (int32_t)floor(uvSample.x + xFinalTransform)% m_size.x;

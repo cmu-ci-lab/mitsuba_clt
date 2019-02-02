@@ -1,0 +1,80 @@
+<?xml version='1.0' encoding='utf-8'?>
+
+<scene version="0.5.0">
+	<integrator type="bdpt">
+		<boolean name="lightImage" value="false"/>
+        <string name="type" value="column"/>
+	</integrator>
+
+	<sensor type="perspective">
+		<float name="farClip" value="2800"/>
+		<float name="fov" value="39.3077"/>
+		<string name="fovAxis" value="x"/>
+		<float name="nearClip" value="10"/>
+		<transform name="toWorld">
+
+			<lookat target="0.5, 0, 0" origin="0.5, 0, -10" up="0, 1, 0"/>
+		</transform>
+
+		<sampler type="ldsampler">
+			<integer name="sampleCount" value="16"/>
+		</sampler>
+
+		<film type="hdrfilm">
+			<integer name="height" value="512"/>
+			<integer name="width" value="512"/>
+            <boolean name="banner" value="false"/>
+			<rfilter type="box">
+            </rfilter>
+            
+		</film>
+	</sensor>
+
+	<bsdf type="diffuse" id="white">
+		<spectrum name="reflectance" value="1"/>
+	</bsdf>
+
+	<bsdf type="diffuse" id="red">
+		<spectrum name="reflectance" value="1"/>
+	</bsdf>
+
+	<bsdf type="diffuse" id="green">
+		<spectrum name="reflectance" value="1"/>
+	</bsdf>
+
+	<bsdf type="diffuse" id="light">
+		<spectrum name="reflectance" value="400:0.78, 500:0.78, 600:0.78, 700:0.78"/>
+	</bsdf>
+
+	     <emitter type="perspectiveprojector" id="light 0">
+
+            <float name="farClip" value="2800"/>
+	        <float name="nearClip" value="10"/>
+            <float name="fov" value="39.3077"/>
+            <string name="fovAxis" value="x"/>
+	        <transform name="toWorld">
+                <lookat target="1.39, 0, 0" origin="1.39, 0, -10" up="0, 1, 0"/>
+
+            </transform>
+	        <float name="width" value="512"/>
+	        <float name="height" value="512"/>
+            <integer name="colDisplacement" value="38"/>
+
+	        <string name="filename" value="images/white_512.png"/>
+	        <float name="scale" value="300"/>
+	    </emitter>
+         
+	<shape type="obj">
+		<string name="filename" value="meshes/cbox_corner_1.obj"/>
+
+		<ref id="white"/>
+	</shape>
+
+
+	<shape type="obj">
+		<string name="filename" value="meshes/cbox_corner_2.obj"/>
+
+		<ref id="red"/>
+	</shape>
+    
+</scene>
