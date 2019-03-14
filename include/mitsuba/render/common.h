@@ -113,7 +113,7 @@ public:
 	 */
 	Point2 uv;
 
-  uint32_t probeType;
+  uint32_t probeType = 0x00;
 
 	/**
 	 * \brief Optional: Pointer to an associated object
