@@ -54,7 +54,6 @@
         <float name="farClip" value="2800"/>
         <float name="focusDistance" value="10000"/>
         <transform name="toWorld">
-            
          	<lookat target="292.981, 223.235, -292.479" origin="292.999, 223.175, -293.477" up="0.00442367, 0.998196, -0.0598828"/>
         </transform>
         <float name="fov" value="36"/>

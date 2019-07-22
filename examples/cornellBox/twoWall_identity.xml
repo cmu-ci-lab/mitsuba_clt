@@ -3,8 +3,9 @@
 <scene version="0.5.0">
 	<integrator type="bdpt">
 		<boolean name="lightImage" value="false"/>
-        <string name="type" value="identity"/>
 	</integrator>
+    
+    <probe type="identity"/>
 
 	<sensor type="perspective">
 		<float name="farClip" value="2800"/>
@@ -46,24 +47,24 @@
 		<spectrum name="reflectance" value="400:0.78, 500:0.78, 600:0.78, 700:0.78"/>
 	</bsdf>
 
-	     <emitter type="perspectiveprojector" id="light 0">
+    <emitter type="perspectiveprojector" id="light 0">
 
-            <float name="farClip" value="2800"/>
-	        <float name="nearClip" value="10"/>
-            <float name="fov" value="39.3077"/>
-            <string name="fovAxis" value="x"/>
-	        <transform name="toWorld">
-                <lookat target="0.5, 0, 0" origin="0.5, 0, -10" up="0, 1, 0"/>
+        <float name="farClip" value="2800"/>
+        <float name="nearClip" value="10"/>
+        <float name="fov" value="39.3077"/>
+        <string name="fovAxis" value="x"/>
+        <transform name="toWorld">
+            <lookat target="0.5, 0, 0" origin="0.5, 0, -10" up="0, 1, 0"/>
 
-            </transform>
-	        <float name="width" value="512"/>
-	        <float name="height" value="512"/>
-	        <integer name="rowDisplacement" value="0"/>
-            <integer name="colDisplacement" value="0"/>
+        </transform>
+        <float name="width" value="512"/>
+        <float name="height" value="512"/>
+        <integer name="rowDisplacement" value="0"/>
+        <integer name="colDisplacement" value="0"/>
 
-	        <string name="filename" value="images/white_512.png"/>
-	        <float name="scale" value="300"/>
-	    </emitter>
+        <string name="filename" value="images/white_512.png"/>
+        <float name="scale" value="300"/>
+    </emitter>
          
 	<shape type="obj">
 		<string name="filename" value="meshes/cbox_corner_1.obj"/>

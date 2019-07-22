@@ -3,13 +3,10 @@
 <scene version="0.5.0">
 	<integrator type="bdpt">
 		<boolean name="lightImage" value="false"/>
+        <boolean name="sampleDirect" value="false"/>
 	</integrator>
     
-    <probe type="row">
-        <disparity y="38"/>
-    </probe>
-    
-    <string name="type" value="row"/>
+    <probe type="epipolar"/>
 
 	<sensor type="perspective">
 		<float name="farClip" value="2800"/>
@@ -18,7 +15,7 @@
 		<float name="nearClip" value="10"/>
 		<transform name="toWorld">
 
-			<lookat target="0.5, 0, 0" origin="0.5, 0, -10" up="1, 0, 0"/>
+			<lookat target="0.5, 0, 0" origin="0.5, 0, -10" up="0, 1, 0"/>
 		</transform>
 
 		<sampler type="ldsampler">
@@ -58,12 +55,13 @@
         <float name="fov" value="39.3077"/>
         <string name="fovAxis" value="x"/>
         <transform name="toWorld">
-            <lookat target="1.39, 0, 0" origin="1.39, 0, -10" up="1, 0, 0"/>
+            <lookat target="1.39, 0, 0" origin="1.39, 0, -10" up="0, 1, 0"/>
 
         </transform>
         <float name="width" value="512"/>
         <float name="height" value="512"/>
-        <integer name="rowDisplacement" value="38"/>
+        <integer name="rowDisplacement" value="0"/>
+        <integer name="colDisplacement" value="0"/>
 
         <string name="filename" value="images/white_512.png"/>
         <float name="scale" value="300"/>

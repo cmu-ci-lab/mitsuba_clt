@@ -42,15 +42,15 @@
         <spectrum name="reflectance" value="400:0.78, 500:0.78, 600:0.78, 700:0.78"/>
     </bsdf>
     
-            <emitter type="orthographicprojector" id="light 0">
-                <transform name="toWorld">
-                    <scale x="256" y="256"/>
-                     <lookAt origin="278, 273, -800" target="278, 273, -799" up="0, 1, 0"/>
-                </transform>
+    <emitter type="orthographicprojector" id="light 0">
+        <transform name="toWorld">
+        <scale x="256" y="256"/>
+        <lookAt origin="278, 273, -800" target="278, 273, -799" up="0, 1, 0"/>
+        </transform>
 
-                <float name="irradiance" value="100000"/>
-                <string name="filename" value="./images/white_512.png"/>
-            </emitter>
+        <float name="scale" value="100000"/>
+        <string name="filename" value="./images/white_512.png"/>
+    </emitter>
 
     <shape type="obj">
         <string name="filename" value="meshes/cbox_luminaire.obj"/>
