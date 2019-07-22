@@ -57,6 +57,7 @@ class PhotonMap;
 struct PositionSamplingRecord;
 class PreviewWorker;
 class ProjectiveCamera;
+class Probe;
 struct RadianceQueryRecord;
 struct PositionSamplingRecord;
 class Random;

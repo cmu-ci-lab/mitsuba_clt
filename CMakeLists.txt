@@ -167,6 +167,8 @@ add_subdirectory(src/films)
 add_subdirectory(src/sensors)
 # Emitters
 add_subdirectory(src/emitters)
+# Probing Patterns
+add_subdirectory(src/probes)
 # Participating media
 add_subdirectory(src/medium)
 # Volumetric data sources

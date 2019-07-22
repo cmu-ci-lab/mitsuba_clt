@@ -20,7 +20,7 @@
 #include <mitsuba/render/medium.h>
 #include <mitsuba/core/track.h>
 #include <mitsuba/core/frame.h>
-#include <mitsuba/bidir/probe.h>
+#include <mitsuba/render/probe.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -122,6 +122,17 @@ public:
 	PerspectiveCameraImpl(Stream *stream, InstanceManager *manager)
 			: PerspectiveCamera(stream, manager) {
 		configure();
+	}
+
+	void configureProbe(Stream *stream) const{
+		stream->writeFloat(m_normalization);
+		stream->writeFloat(m_nearClip);
+        stream->writeFloat(m_farClip);
+		m_resolution.serialize(stream);
+		m_worldTransform->serialize(stream);
+		m_cameraToSample.serialize(stream);
+		m_sampleToCamera.serialize(stream);
+		m_imageRect.serialize(stream);
 	}
 
 	void configure() {
@@ -326,6 +337,7 @@ public:
 			const Point2 &sample, const Point2 *extra) const {
 		const Transform &trafo = m_worldTransform->eval(pRec.time);
 
+
 		Point samplePos(sample.x, sample.y, 0.0f);
 
 		if (extra) {
@@ -343,11 +355,23 @@ public:
 
 		/* Turn that into a normalized ray direction */
 		Vector d = normalize(Vector(nearP));
+
+		Float cosTheta = Frame::cosTheta(d);
+
+		Point planeCoordinate(0.0f,0.0f,1.0f);
+		/* Check if the direction points behind the camera */
+		if (cosTheta > 0) {
+			/* Compute the position on the plane at distance 1 */
+			Float invCosTheta = 1.0f / cosTheta;
+			planeCoordinate.x = d.x * invCosTheta;
+			planeCoordinate.y = d.y * invCosTheta;
+		}
+
+
+		pRec.worldCameraSample = planeCoordinate;
 		dRec.d = trafo(d);
 		dRec.measure = ESolidAngle;
 		dRec.pdf = m_normalization / (d.z * d.z * d.z);
-//		std::string str = "cam" + (*extra).toString() + pRec.uv.toString();
-//		std::cout<<str<<endl;
 
 		return Spectrum(1.0f);
 	}
@@ -359,6 +383,42 @@ public:
 
 		const Transform &trafo = m_worldTransform->eval(pRec.time);
 
+		Vector d = trafo.inverse()(dRec.d);
+		Float cosTheta = Frame::cosTheta(d);
+
+		/* Check if the direction points behind the camera */
+		if (cosTheta <= 0) {
+      return 0.0f;
+    }
+
+		/* Compute the position on the plane at distance 1 */
+		Float invCosTheta = 1.0f / cosTheta;
+		Point2 p(d.x * invCosTheta, d.y * invCosTheta);
+
+
+		/* Check if the point lies inside the chosen crop rectangle */
+		if (!m_imageRect.contains(p)) {
+			return 0.0f;
+		}
+
+		Point samplePoint(p.x,p.y,1.0f);
+		Point sample = m_cameraToSample(samplePoint * m_nearClip);
+		Float u = sample.x * m_resolution.x, v = sample.y * m_resolution.y;
+		Float xPos = u;
+		Float yPos = v;
+
+		if((pRec.probeType==Probe::ECOLUMN) && (xPos - floor(pRec.cameraUV.x) > 1.f || xPos < pRec.cameraUV.x)) {
+			return 0.f;
+		}
+		else if(pRec.probeType==Probe::EROW && fabs(yPos - floor(pRec.uv.y)) > 1.f){
+			return 0.f;
+		}
+		else if(pRec.probeType==Probe::EIDENTITY && (fabs(yPos - floor(pRec.uv.y)) > 1.f ||
+				fabs(xPos - floor(pRec.uv.x)) > 1.f)) {
+			return 0.f;
+		}
+
+
 		return importance(trafo.inverse()(dRec.d));
 	}
 
@@ -369,7 +429,42 @@ public:
 
 		const Transform &trafo = m_worldTransform->eval(pRec.time);
 
-		return Spectrum(importance(trafo.inverse()(dRec.d)));
+    Vector d = trafo.inverse()(dRec.d);
+    Float cosTheta = Frame::cosTheta(d);
+
+    /* Check if the direction points behind the camera */
+    if (cosTheta <= 0) {
+      return Spectrum(0.0f);
+    }
+
+    /* Compute the position on the plane at distance 1 */
+    Float invCosTheta = 1.0f / cosTheta;
+    Point2 p(d.x * invCosTheta, d.y * invCosTheta);
+
+
+    /* Check if the point lies inside the chosen crop rectangle */
+    if (!m_imageRect.contains(p)) {
+      return Spectrum(0.0f);
+    }
+
+    Point samplePoint(p.x,p.y,1.0f);
+    Point sample = m_cameraToSample(samplePoint * m_nearClip);
+    Float u = sample.x * m_resolution.x, v = sample.y * m_resolution.y;
+    Float xPos = u;
+    Float yPos = v;
+
+    if((pRec.probeType==Probe::ECOLUMN) && (xPos - floor(pRec.cameraUV.x) > 1.f || xPos < floor(pRec.cameraUV.x))) {
+        return Spectrum(0.f);
+    }
+    else if(pRec.probeType==Probe::EROW && fabs(yPos - floor(pRec.uv.y)) > 1.f){
+        return Spectrum(0.f);
+    }
+    else if(pRec.probeType==Probe::EIDENTITY && (fabs(yPos - floor(pRec.uv.y)) > 1.f ||
+    fabs(xPos - floor(pRec.uv.x)) > 1.f)) {
+        return Spectrum(0.f);
+    }
+
+    return Spectrum(importance(trafo.inverse()(dRec.d)));
 	}
 
 	bool getSamplePosition(const PositionSamplingRecord &pRec,
@@ -414,18 +509,17 @@ public:
 
 		dRec.uv.x *= m_resolution.x;
 		dRec.uv.y *= m_resolution.y;
-//		SLog(EWarn, "%d",dRec.probeType);
 
-		if((dRec.probeType==Probe::ECOLUMN) && floor(dRec.uv.x) != floor(dRec.pixelPosition.x)) {
+		if((dRec.probeType==Probe::ECOLUMN) && (dRec.uv.x - floor(dRec.cameraUV.x) > 1.f ||dRec.uv.x < floor(dRec.cameraUV.x))){
 			dRec.pdf = 0;
 			return Spectrum(0.0f);
 		}
-		else if((dRec.probeType==Probe::EROW) && floor(dRec.uv.y) != floor(dRec.pixelPosition.y)) {
+		else if((dRec.probeType==Probe::EROW) && math::floorToInt(dRec.uv.y) != math::floorToInt(dRec.pixelPosition.y)) {
 			dRec.pdf = 0;
 			return Spectrum(0.0f);
 		}
-		else if((dRec.probeType==Probe::EIDENTITY) && (floor(dRec.uv.x) != floor(dRec.pixelPosition.x)
-						|| floor(dRec.uv.y) != floor(dRec.pixelPosition.y))) {
+		else if((dRec.probeType==Probe::EIDENTITY) && ((math::floorToInt(dRec.uv.x) != math::floorToInt(dRec.pixelPosition.x))||
+						floor(dRec.uv.y) != floor(dRec.pixelPosition.y))){
 			dRec.pdf = 0;
 			return Spectrum(0.0f);
 		}
@@ -435,12 +529,14 @@ public:
 			  invDist = 1.0f / dist;
 		localD *= invDist;
 
+
 		dRec.p = trafo.transformAffine(Point(0.0f));
 		dRec.d = (dRec.p - dRec.ref) * invDist;
 		dRec.dist = dist;
 		dRec.n = trafo(Vector(0.0f, 0.0f, 1.0f));
 		dRec.pdf = 1;
 		dRec.measure = EDiscrete;
+
 
 		return Spectrum(
 			importance(localD) * invDist * invDist);

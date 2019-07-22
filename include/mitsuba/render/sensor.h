@@ -248,24 +248,24 @@ public:
 	virtual Spectrum eval(const Intersection &its, const Vector &d,
 			Point2 &samplePos) const;
 
-	/**
-	 * \brief Return the sample position associated with a given
-	 * position and direction sampling record
-	 *
-	 * \param dRec
-	 *    A direction sampling record, which specifies the query direction
-	 *
-	 * \param pRec
-	 *    A position sampling record, which specifies the query position
-	 *
-	 * \return \c true if the specified ray is visible by the camera
-	 *
-	 * \remark
-	 *    In the Python API, the signature of this function is
-	 *    <tt>visible, position = sensor.getSamplePosition(pRec, dRec)</tt>
-	 */
-	virtual bool getSamplePosition(const PositionSamplingRecord &pRec,
-			const DirectionSamplingRecord &dRec, Point2 &position) const;
+//	/**
+//	 * \brief Return the sample position associated with a given
+//	 * position and direction sampling record
+//	 *
+//	 * \param dRec
+//	 *    A direction sampling record, which specifies the query direction
+//	 *
+//	 * \param pRec
+//	 *    A position sampling record, which specifies the query position
+//	 *
+//	 * \return \c true if the specified ray is visible by the camera
+//	 *
+//	 * \remark
+//	 *    In the Python API, the signature of this function is
+//	 *    <tt>visible, position = sensor.getSamplePosition(pRec, dRec)</tt>
+//	 */
+//	virtual bool getSamplePosition(const PositionSamplingRecord &pRec,
+//			const DirectionSamplingRecord &dRec, Point2 &position) const;
 
 	/**
 	 * \brief Evaluate the temporal component of the sampling density
@@ -663,53 +663,54 @@ protected:
  *
  * \ingroup librender
  */
-	class MTS_EXPORT_RENDER CodedPerspectiveCamera : public CodedProjectiveCamera {
-	public:
-		// =============================================================
-		//! @{ \name Field of view-related
-		// =============================================================
+class MTS_EXPORT_RENDER CodedPerspectiveCamera : public CodedProjectiveCamera {
+public:
+	// =============================================================
+	//! @{ \name Field of view-related
+	// =============================================================
 
-		/// Return the horizontal field of view in degrees
-		inline Float getXFov() const { return m_xfov; }
+	/// Return the horizontal field of view in degrees
+	inline Float getXFov() const { return m_xfov; }
 
-		/// Set the horizontal field of view in degrees
-		void setXFov(Float xfov);
+	/// Set the horizontal field of view in degrees
+	void setXFov(Float xfov);
 
-		/// Return the vertical field of view in degrees
-		Float getYFov() const;
+	/// Return the vertical field of view in degrees
+	Float getYFov() const;
 
-		/// Set the vertical field of view in degrees
-		void setYFov(Float yfov);
+	/// Set the vertical field of view in degrees
+	void setYFov(Float yfov);
 
-		/// Return the diagonal field of view in degrees
-		Float getDiagonalFov() const;
+	/// Return the diagonal field of view in degrees
+	Float getDiagonalFov() const;
 
-		/// Set the diagonal field of view in degrees
-		void setDiagonalFov(Float dfov);
+	/// Set the diagonal field of view in degrees
+	void setDiagonalFov(Float dfov);
 
-		//! @}
-		// =============================================================
+	//! @}
+	// =============================================================
 
-		/** \brief Configure the object (called \a once after construction
-           and addition of all child \ref ConfigurableObject instances). */
-		virtual void configure();
+	/** \brief Configure the object (called \a once after construction
+       and addition of all child \ref ConfigurableObject instances). */
+	virtual void configure();
 
-		/// Serialize this camera to a binary data stream
-		virtual void serialize(Stream *stream, InstanceManager *manager) const;
+	/// Serialize this camera to a binary data stream
+	virtual void serialize(Stream *stream, InstanceManager *manager) const;
 
-		MTS_DECLARE_CLASS()
-	protected:
-		/// Construct a new perspective camera instance
-		CodedPerspectiveCamera(const Properties &props);
+	MTS_DECLARE_CLASS()
+protected:
+	/// Construct a new perspective camera instance
+	CodedPerspectiveCamera(const Properties &props);
 
-		/// Unserialize a perspective camera instance from a binary data stream
-		CodedPerspectiveCamera(Stream *stream, InstanceManager *manager);
+	/// Unserialize a perspective camera instance from a binary data stream
+	CodedPerspectiveCamera(Stream *stream, InstanceManager *manager);
 
-		/// Virtual destructor
-		virtual ~CodedPerspectiveCamera();
-	protected:
-		Float m_xfov;
-	};
+	/// Virtual destructor
+	virtual ~CodedPerspectiveCamera();
+
+protected:
+	Float m_xfov;
+};
 
 MTS_NAMESPACE_END
 

@@ -81,6 +81,8 @@ SceneHandler::SceneHandler(const ParameterMap &params,
 	m_tags["phase"]      = TagEntry(EPhase,      MTS_CLASS(PhaseFunction));
 	m_tags["bsdf"]       = TagEntry(EBSDF,       MTS_CLASS(BSDF));
 	m_tags["rfilter"]    = TagEntry(ERFilter,    MTS_CLASS(ReconstructionFilter));
+    m_tags["probe"]      = TagEntry(EProbe,      MTS_CLASS(Probe));
+	m_tags["disparity"]  = TagEntry(EDisparity,  (Class *) NULL);
 	m_tags["null"]       = TagEntry(ENull,       (Class *) NULL);
 	m_tags["ref"]        = TagEntry(EReference,  (Class *) NULL);
 	m_tags["integer"]    = TagEntry(EInteger,    (Class *) NULL);
@@ -262,7 +264,6 @@ void SceneHandler::startElement(const XMLCh* const xmlName,
 		default:
 			break;
 	}
-
 	m_context.push(context);
 }
 
@@ -629,6 +630,14 @@ void SceneHandler::endElement(const XMLCh* const xmlName) {
 				context.parent->properties.setAnimatedTransform(
 					context.attributes["name"], m_animatedTransform);
 				m_animatedTransform = NULL;
+			}
+			break;
+
+		case EDisparity: {
+				int x = math::floorToInt(parseFloat(name, context.attributes["x"], 0));
+				int y = math::floorToInt(parseFloat(name, context.attributes["y"], 0));
+				m_disparity = Vector2i(x, y);
+				context.parent->properties.setDisparity("disparity", m_disparity);
 			}
 			break;
 

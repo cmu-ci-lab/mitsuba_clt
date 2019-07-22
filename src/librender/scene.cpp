@@ -20,6 +20,7 @@
 #include <mitsuba/render/renderjob.h>
 #include <mitsuba/core/plugin.h>
 #include <mitsuba/core/statistics.h>
+#include <mitsuba/core/mstream.h>
 
 #define DEFAULT_BLOCKSIZE 32
 
@@ -101,6 +102,7 @@ Scene::Scene(Scene *scene) : NetworkedObject(Properties()) {
 	m_specialShapes = scene->m_specialShapes;
 	m_degenerateSensor = scene->m_degenerateSensor;
 	m_degenerateEmitters = scene->m_degenerateEmitters;
+	m_probe = scene->m_probe; // Add probe, so that scene can be copied correctly
 }
 
 Scene::Scene(Stream *stream, InstanceManager *manager)
@@ -313,6 +315,19 @@ void Scene::configure() {
 	m_sampler = m_sensor->getSampler();
 
 	m_integrator->configureSampler(this, m_sampler);
+
+	if(m_probe != NULL) {
+		Stream *stream = new MemoryStream();
+		stream->setByteOrder(Stream::ENetworkByteOrder);
+		m_sensor->configureProbe(stream);
+		stream->seek(0);
+		m_probe->readFromCamera(stream);
+		stream->seek(0);
+		m_emitters[0]->configureProbe(stream);
+		stream->seek(0);
+		m_probe->readFromProjector(stream);
+		m_probe->configureAfterLoadingCamProj();
+	}
 }
 
 void Scene::invalidate() {
@@ -519,6 +534,9 @@ void Scene::addChild(const std::string &name, ConfigurableObject *child) {
 		if (shape->isSensor()) // determine sensors as early as possible
 			addSensor(shape->getSensor());
 		m_shapes.push_back(shape);
+	} else if (cClass->derivesFrom(MTS_CLASS(Probe))) {
+		m_probe = static_cast<Probe *>(child);
+
 	} else if (cClass->derivesFrom(MTS_CLASS(Scene))) {
 		ref<Scene> scene = static_cast<Scene *>(child);
 		/* A scene from somewhere else has been included.
@@ -833,7 +851,11 @@ Spectrum Scene::sampleEmitterDirect(DirectSamplingRecord &dRec,
 	Float emPdf;
 	size_t index = m_emitterPDF.sampleReuse(sample.x, emPdf);
 	const Emitter *emitter = m_emitters[index].get();
-	Spectrum value = emitter->sampleDirect(dRec, sample);
+    Spectrum value;
+	if(m_probe != NULL)
+	    value = m_probe->sampleProjectorDirect(dRec, sample);
+	else
+	    value = emitter->sampleDirect(dRec, sample);
 
 	if (dRec.pdf != 0) {
 		if (testVisibility) {
@@ -899,7 +921,11 @@ Spectrum Scene::sampleAttenuatedEmitterDirect(DirectSamplingRecord &dRec,
 
 Spectrum Scene::sampleSensorDirect(DirectSamplingRecord &dRec,
 		const Point2 &sample, bool testVisibility) const {
-	Spectrum value = m_sensor->sampleDirect(dRec, sample);
+    Spectrum value;
+    if(m_probe != NULL)
+        value = m_probe->sampleCameraDirect(dRec, sample);
+    else
+        value = m_sensor->sampleDirect(dRec, sample);
 
 	if (dRec.pdf != 0) {
 		if (testVisibility) {
@@ -948,10 +974,14 @@ Spectrum Scene::sampleAttenuatedSensorDirect(DirectSamplingRecord &dRec,
 
 Float Scene::pdfEmitterDirect(const DirectSamplingRecord &dRec) const {
 	const Emitter *emitter = static_cast<const Emitter *>(dRec.object);
+	if(m_probe != NULL)
+	    return m_probe->pdfProjectorDirect(dRec) * pdfEmitterDiscrete(emitter);
 	return emitter->pdfDirect(dRec) * pdfEmitterDiscrete(emitter);
 }
 
 Float Scene::pdfSensorDirect(const DirectSamplingRecord &dRec) const {
+    if(m_probe != NULL)
+        return m_probe->pdfCameraDirect(dRec);
 	return m_sensor->pdfDirect(dRec);
 }
 
@@ -972,26 +1002,34 @@ Spectrum Scene::sampleEmitterPosition(
 	return value / emPdf;
 }
 
-	Spectrum Scene::sampleProjectiveEmitterPosition(
-			PositionSamplingRecord &pRec,
-			const Point2 &_sample, const Point2 *extra) const {
-		Point2 sample(_sample);
+Spectrum Scene::sampleProjectiveEmitterPosition(
+		PositionSamplingRecord &pRec, Sampler *sampler,
+		const Point2 &_sample, const Point2 *extra) const {
+	Point2 sample(_sample);
 
-		/* Randomly pick an emitter */
-		Float emPdf;
-		size_t index = m_emitterPDF.sampleReuse(sample.x, emPdf);
-		const Emitter *emitter = m_emitters[index].get();
+	/* Randomly pick an emitter */
+	Float emPdf;
+	size_t index = m_emitterPDF.sampleReuse(sample.x, emPdf);
+	const Emitter *emitter = m_emitters[index].get();
 
-		Spectrum value = emitter->samplePosition(pRec, sample, extra);
-
-		pRec.object = emitter;
-		pRec.pdf *= emPdf;
-
-		return value / emPdf;
+    Spectrum value;
+	if(m_probe != NULL) {
+	    value = m_probe->sampleProjectorPosition(pRec, sampler, sample, extra);
+    }
+	else{
+	    value = emitter->samplePosition(pRec, sample);
 	}
+
+	pRec.object = emitter;
+	pRec.pdf *= emPdf;
+
+	return value / emPdf;
+}
 
 Float Scene::pdfEmitterPosition(const PositionSamplingRecord &pRec) const {
 	const Emitter *emitter = static_cast<const Emitter *>(pRec.object);
+	if(m_probe != NULL)
+	    return m_probe->pdfProjectorPosition(pRec) * pdfEmitterDiscrete(emitter);
 	return emitter->pdfPosition(pRec) * pdfEmitterDiscrete(emitter);
 }
 

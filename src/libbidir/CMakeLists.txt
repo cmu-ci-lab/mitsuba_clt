@@ -21,7 +21,6 @@ set(HDRS
   ${INCLUDE_DIR}/rsampler.h
   ${INCLUDE_DIR}/util.h
   ${INCLUDE_DIR}/vertex.h
-  ${INCLUDE_DIR}/probe.h
 )
 
 # Common sources

@@ -48,6 +48,7 @@ set(HDRS
   ${INCLUDE_DIR}/util.h
   ${INCLUDE_DIR}/volume.h
   ${INCLUDE_DIR}/vpl.h
+  ${INCLUDE_DIR}/probe.h
 )
 
 set(SRCS
@@ -85,6 +86,7 @@ set(SRCS
   util.cpp
   volume.cpp
   vpl.cpp
+  probe.cpp
 )
 
 add_definitions(-DMTS_BUILD_MODULE=MTS_MODULE_RENDER)

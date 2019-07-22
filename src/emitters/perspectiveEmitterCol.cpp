@@ -224,7 +224,7 @@ MTS_NAMESPACE_BEGIN
                 return 0.0f;
 
             return m_normalization * invCosTheta
-                   * invCosTheta * invCosTheta * (Float)m_resolution.x;
+                   * invCosTheta * invCosTheta;
         }
 
         Transform getProjectionTransform(const Point2 &apertureSample,
@@ -270,16 +270,42 @@ MTS_NAMESPACE_BEGIN
                 samplePos.y = (extra->y + sample.y) * m_invResolution.y;
             }
 
-            Point2 uvSample(samplePos.x * m_resolution.x, samplePos.y * m_resolution.y);
-            int32_t xUnitTransform = m_colTransform % m_size.x;
-            int32_t  xFinalTransform = xUnitTransform < 0 ? xUnitTransform + m_size.x: xUnitTransform;
-            int32_t yUnitTransform = m_rowTransform % m_size.y;
-            int32_t  yFinalTransform = yUnitTransform < 0 ? yUnitTransform + m_size.y: yUnitTransform;
 
-            int32_t xPixelPos = (int32_t)floor(uvSample.x + xFinalTransform)% m_size.x;
-            int32_t yPixelPos = (int32_t)floor(uvSample.y + yFinalTransform) % m_size.y;
-            Float samplePosRelativeToPixelx = uvSample.x-(int32_t)floor(uvSample.x);
-            Float samplePosRelativeToPixely = uvSample.y-(int32_t)floor(uvSample.y);
+//          printf("shifted %d initial %d\n",math::roundToInt(pRec.uv.x), math::roundToInt(pRec.cameraUV.x));
+//            assert((math::roundToInt(pRec.cameraUV.x) + 39) % 512 == math::roundToInt(pRec.uv.x));
+
+            Point2 uvSample(samplePos.x * m_resolution.x, samplePos.y * m_resolution.y);
+            int xUnitTransform = m_colTransform % m_size.x;
+            int xFinalTransform = xUnitTransform < 0 ? xUnitTransform + m_size.x: xUnitTransform;
+            int yUnitTransform = m_rowTransform % m_size.y;
+            int yFinalTransform = yUnitTransform < 0 ? yUnitTransform + m_size.y: yUnitTransform;
+
+
+//            if(xFinalTransform != 39)
+//              printf("x pos %d \n", xFinalTransform);
+//            assert(xFinalTransform == 39);
+
+            int xPixelPos = (math::floorToInt(uvSample.x) + xFinalTransform)% m_size.x;
+            int yPixelPos = (math::floorToInt(uvSample.y) + yFinalTransform)% m_size.y;
+            Float samplePosRelativeToPixelx = uvSample.x-floor(uvSample.x);
+            Float samplePosRelativeToPixely = uvSample.y-floor(uvSample.y);
+
+
+//          if(xPixelPos != (math::floorToInt(extra->x) + 39)% m_size.x) {
+//              printf("extra %d +  sample %f = samplePos %f cam %f\n",
+//                     math::floorToInt(extra->x), sample.x,
+//                     math::floorToInt(extra->x) + sample.x, pRec.cameraUV.x);
+////            printf("final %f xpixelPos %d uvSample %f uv+trans %f original %f extra + sample %f cameraUV %f\n",
+////                   (Float)xPixelPos + samplePosRelativeToPixelx, xPixelPos, uvSample.x, uvSample.x + xFinalTransform, extra->x,
+////                   extra->x + sample.x, pRec.cameraUV.x)
+////            printf("float %f integer %f\n",samplePosRelativeToPixelx,(Float)xPixelPos);
+//            double one = extra->x;
+//            double two = sample.x;
+////            printf("%f + %f = %f\n",0.999991,1.0f,0.999991+1.0f);
+//            printf("%lf + %lf = %lf %f\n",one,two,one+two,(Float)(one + two));
+//          }
+//          assert(xPixelPos == (math::floorToInt(extra->x) + 39)% m_size.x ||
+//          xPixelPos == (math::floorToInt(extra->x) + 39)% m_size.x + 1);
 
             samplePos = Point((xPixelPos + samplePosRelativeToPixelx) * m_invResolution.x,
                               (yPixelPos + samplePosRelativeToPixely) * m_invResolution.y,
@@ -287,6 +313,19 @@ MTS_NAMESPACE_BEGIN
 
             pRec.uv = Point2(samplePos.x * m_resolution.x,
                              samplePos.y * m_resolution.y);
+
+//          if((fabs(pRec.cameraUV.x-256.0)<1.0f && fabs(pRec.cameraUV.y-256.0)<1.0f)){
+//            Point lowX = trafo(m_sampleToCamera(Point(0.5f,0.0f,0.f)));
+//            Point hiX = trafo(m_sampleToCamera(Point(0.5f,1.0f,0.f)));
+//            printf("original pixel: %s, lowest world X %s, highest world X %s \n",extra->toString().c_str(),
+//                   lowX.toString().c_str(), hiX.toString().c_str());
+//            printf("pRec.uv %s\n",pRec.uv.toString().c_str());
+//
+//          }
+
+//          if((math::floorToInt(pRec.uv.x) != math::floorToInt(pRec.cameraUV.x) + 39))
+//            printf("shifted %d initial %d\n",math::floorToInt(pRec.uv.x), math::floorToInt(pRec.cameraUV.x));
+//          assert((math::floorToInt(pRec.uv.x) == math::floorToInt(pRec.cameraUV.x) + 39));
 
             /* Compute the corresponding position on the
                near plane (in local camera space) */
@@ -300,7 +339,7 @@ MTS_NAMESPACE_BEGIN
 
 //            std::string str = (*extra).toString() + pRec.uv.toString();
 //            std::cout<<str<<endl;
-            return Spectrum(m_scale)/(Float)m_resolution.x;
+            return Spectrum(m_scale/(Float)m_resolution.x);
         }
 
         Float pdfDirection(const DirectionSamplingRecord &dRec,
@@ -310,7 +349,42 @@ MTS_NAMESPACE_BEGIN
 
             const Transform &trafo = m_worldTransform->eval(pRec.time);
 
-            return  importance(trafo.inverse()(dRec.d));
+            Vector d = trafo.inverse()(dRec.d);
+            Float cosTheta = Frame::cosTheta(d);
+
+            /* Check if the direction points behind the camera */
+            if (cosTheta <= 0)
+                return 0.0f;
+
+            /* Compute the position on the plane at distance 1 */
+            Float invCosTheta = 1.0f / cosTheta;
+            Point2 p(d.x * invCosTheta, d.y * invCosTheta);
+
+
+            /* Check if the point lies inside the chosen crop rectangle */
+            if (!m_imageRect.contains(p)) {
+                return 0.0f;
+            }
+
+            Point samplePoint(p.x,p.y,1.0f);
+            Point sample = m_cameraToSample(samplePoint * m_nearClip);
+            Float u = sample.x * m_size.x, v = sample.y * m_size.y;
+//            int xPos = math::floorToInt(u), yPos = math::floorToInt(v);
+           Float xPos = u, yPos = v;
+          if(((xPos - pRec.cameraUV.x - m_colTransform)<1.f && (xPos - pRec.cameraUV.x - m_colTransform)>=0.f)
+              ){
+//            || ((xPos + m_size.x - pRec.cameraUV.x - m_colTransform) <=1.f
+//                && (xPos + m_size.x - pRec.cameraUV.x - m_colTransform)>=0.f)l
+//              printf("original %f later %f\n",pRec.dualUV.x, xPos);
+            return importance(d) * (Float) m_resolution.x;
+          }
+//            if(xPos - math::floorToInt(pRec.cameraUV.x) ==m_colTransform ||
+//               xPos + m_size.x - math::floorToInt(pRec.cameraUV.x) ==m_colTransform) {
+////              printf("original %f later %f\n",pRec.dualUV.x, xPos);
+//              return importance(d) * (Float) m_resolution.x;
+//            }
+//            printf("original %f later %f\n",pRec.dualUV.x, xPos);
+            return  0.0f;
         }
 
         Spectrum evalDirection(const DirectionSamplingRecord &dRec,
@@ -320,9 +394,54 @@ MTS_NAMESPACE_BEGIN
 
             const Transform &trafo = m_worldTransform->eval(pRec.time);
 
-            Vector v = trafo.inverse()(dRec.d);
+            Vector d = trafo.inverse()(dRec.d);
+            Float cosTheta = Frame::cosTheta(d);
 
-            return importance(v) * Spectrum(m_scale)/(Float)m_resolution.x;
+            /* Check if the direction points behind the camera */
+            if (cosTheta <= 0) {
+//              if((fabs(pRec.cameraUV.x-0.0)<1.0f && fabs(pRec.cameraUV.y-0.0)<1.0f)) {
+//                printf("evalDirection opposite Direction\n");
+//              }
+              return Spectrum(0.0f);
+            }
+
+            /* Compute the position on the plane at distance 1 */
+            Float invCosTheta = 1.0f / cosTheta;
+            Point2 p(d.x * invCosTheta, d.y * invCosTheta);
+
+
+
+            /* Check if the point lies inside the chosen crop rectangle */
+            if (!m_imageRect.contains(p)) {
+//              if((fabs(pRec.cameraUV.x-0.0)<1.0f && fabs(pRec.cameraUV.y-0.0)<1.0f)) {
+//                printf("evaldirection out of image bound\n");
+//              }
+              return Spectrum(0.0f);
+            }
+
+            Point samplePoint(p.x,p.y,1.0f);
+            Point sample = m_cameraToSample(samplePoint * m_nearClip);
+            Float u = sample.x * m_size.x, v = sample.y * m_size.y;
+            int xPos = math::floorToInt(u), yPos = math::floorToInt(v);
+//            printf("original %f later %d p.x %f p.y %f\n",pRec.dualUV.x, xPos,p.x,p.y);
+
+
+          if(((xPos - pRec.cameraUV.x - m_colTransform)<1.f && (xPos - pRec.cameraUV.x - m_colTransform)>=0.f)){
+//              printf("original %f later %f\n",pRec.dualUV.x, xPos);
+            return importance(d) * Spectrum(m_scale);
+          }
+//            if(xPos - math::floorToInt(pRec.cameraUV.x) ==m_colTransform ||
+//               xPos + m_size.x - math::floorToInt(pRec.cameraUV.x) ==m_colTransform)
+//                return importance(d) * Spectrum(m_scale);
+//            * (Float) m_resolution.x;
+          else {
+//            if((fabs(pRec.cameraUV.x-0.0)<1.0f && fabs(pRec.cameraUV.y-0.0)<1.0f)){
+//              printf("evalDirection not inside column %d %d\n",xPos,yPos);
+//              printf("eval cam.x %f colTransform %d xPos %d\n",pRec.cameraUV.x, m_colTransform,xPos);
+//              printf("diff1 %f diff2 %f\n",xPos - pRec.cameraUV.x - m_colTransform,xPos - pRec.cameraUV.x - m_colTransform);
+//            }
+                return Spectrum(0.f);
+          }
         }
 
         Spectrum sampleRay(Ray &ray, const Point2 &pixelSample,
@@ -374,10 +493,17 @@ MTS_NAMESPACE_BEGIN
             dRec.uv.y *= m_resolution.y;
 
 //          SLog(EWarn, "initial position %f, emiter position %f", dRec.pixelPosition.x,dRec.uv.x);
-          if(floor(dRec.uv.x) != floor(dRec.pixelPosition.x)) {
+            int32_t targetPos = math::floorToInt(dRec.cameraUV.x+m_colTransform)%m_size.x;
+            if(dRec.uv.x < targetPos || dRec.uv.x -  (Float)targetPos > 1.0f) {
+//            printf("sample hit wrong place\n");
             dRec.pdf = 0;
             return Spectrum(0.0f);
           }
+//          if(math::floorToInt(dRec.uv.x) != math::floorToInt(dRec.pixelPosition.x)) {
+////            printf("sample hit wrong place\n");
+//            dRec.pdf = 0;
+//            return Spectrum(0.0f);
+//          }
 
 
             Vector localD(refP);
@@ -392,12 +518,32 @@ MTS_NAMESPACE_BEGIN
             dRec.pdf = 1;
             dRec.measure = EDiscrete;
 
-            return Spectrum(importance(localD) * invDist * invDist * m_scale)/(Float)m_resolution.x;
+            return Spectrum(importance(localD) * invDist * invDist * m_scale);
 
         }
 
         Float pdfDirect(const DirectSamplingRecord &dRec) const {
+
+//          SLog(EWarn, "initial position %f, emiter position %f", dRec.pixelPosition.x,dRec.uv.x);
+            int xPos = math::floorToInt(dRec.uv.x);
+            int initialPos =  math::floorToInt(dRec.cameraUV.x);
+//          SLog(EWarn, "initial position %d, emiter position %d", initialPos,xPos);
+
+//            if(xPos != (initialPos + m_colTransform) % m_size.x)
+//              printf("initial position %d, emiter position %d\n", initialPos,xPos);
+//            assert(xPos - math::floorToInt(dRec.cameraUV.x) ==m_colTransform ||
+//                   xPos - 1 - math::floorToInt(dRec.cameraUV.x) ==m_colTransform);
+
+//          if(floor(dRec.uv.x) != floor(dRec.pixelPosition.x))
+//          if(xPos - math::floorToInt(dRec.cameraUV.x) ==m_colTransform ||
+//             xPos + m_size.x - math::floorToInt(dRec.cameraUV.x) ==m_colTransform){
+
             return (dRec.measure == EDiscrete) ? 1.0f : 0.0f;
+//          }
+
+//          printf("pdf hit wrong place\n");
+//          return 0.0f;
+
         }
 
         AABB getAABB() const {

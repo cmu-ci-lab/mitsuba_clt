@@ -148,6 +148,7 @@ private:
 		ELookAt, EScale, EMatrix, EPoint,
 		EVector, ERGB, ESRGB, EBlackBody,
 		ESpectrum, ETransform, EAnimation,
+		EProbe, EDisparity,
 		EInclude, EAlias, EDefault
 	};
 
@@ -177,6 +178,7 @@ private:
 	Transform m_transform;
 	ref<AnimatedTransform> m_animatedTransform;
 	bool m_isIncludedFile;
+	Vector2i m_disparity;
 };
 
 MTS_NAMESPACE_END

@@ -27,7 +27,7 @@
 MTS_NAMESPACE_BEGIN
 
 typedef boost::variant<
-	bool, int64_t, Float, Point, Vector, Transform, AnimatedTransform *,
+	bool, int64_t, Float, Point, Vector, Vector2i, Transform, AnimatedTransform *,
 	Spectrum, std::string, Properties::Data> ElementData;
 
 struct PropertyElement {
@@ -78,6 +78,7 @@ DEFINE_PROPERTY_ACCESSOR(Transform, Transform, Transform, transform)
 DEFINE_PROPERTY_ACCESSOR(Spectrum, Spectrum, Spectrum, spectrum)
 DEFINE_PROPERTY_ACCESSOR(std::string, std::string, String, string)
 DEFINE_PROPERTY_ACCESSOR(Properties::Data, Properties::Data, Data, data)
+DEFINE_PROPERTY_ACCESSOR(Vector2i, Vector2i, Disparity, disparity)
 
 void Properties::setAnimatedTransform(const std::string &name, const AnimatedTransform *value, bool warnDuplicates) {
 	if (hasProperty(name)) {
@@ -161,6 +162,7 @@ namespace {
 		Properties::EPropertyType operator()(const Spectrum &) const          { return Properties::ESpectrum; }
 		Properties::EPropertyType operator()(const std::string &) const       { return Properties::EString; }
 		Properties::EPropertyType operator()(const Properties::Data &) const  { return Properties::EData; }
+		Properties::EPropertyType operator()(const Vector2i &) const          { return Properties::EDisparity; }
 	};
 
 	class EqualityVisitor : public boost::static_visitor<bool> {
@@ -177,6 +179,7 @@ namespace {
 		bool operator()(const Spectrum &v) const          { const Spectrum *v2 = boost::get<Spectrum>(ref); return v2 ? (v == *v2) : false; }
 		bool operator()(const std::string &v) const       { const std::string *v2 = boost::get<std::string>(ref); return v2 ? (v == *v2) : false; }
 		bool operator()(const Properties::Data &v) const  { const Properties::Data *v2 = boost::get<Properties::Data>(ref); return v2 ? (v == *v2) : false; }
+		bool operator()(const Vector2i &v) const 		  { const Vector2i *v2 = boost::get<Vector2i>(ref); return v2 ? (v == *v2) : false; }
 	private:
 		const ElementData *ref;
 	};
@@ -195,6 +198,7 @@ namespace {
 		void operator()(const Spectrum &v) const          { oss << v.toString(); }
 		void operator()(const std::string &v) const       { oss << (quote ? "\"" : "") << v << (quote ? "\"" : ""); }
 		void operator()(const Properties::Data &v) const  { oss << v.ptr << " (size=" << v.size << ")"; }
+		void operator()(const Vector2i &v) const           { oss << v.toString(); }
 	private:
 		std::ostringstream &oss;
 		bool quote;

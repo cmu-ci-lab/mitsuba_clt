@@ -35,6 +35,7 @@ RenderJob::RenderJob(const std::string &threadName,
 
 	ref<Sensor> sensor = m_scene->getSensor();
 	ref<Sampler> sampler = m_scene->getSampler();
+//	ref<Probe> probe = m_scene->getProbe();
 
 	/* Register the scene with the scheduler if needed */
 	if (sceneResID == -1) {
@@ -53,6 +54,9 @@ RenderJob::RenderJob(const std::string &threadName,
 		m_sensorResID = sensorResID;
 		m_ownsSensorResource = false;
 	}
+
+//	m_probeResID = sched->registerResource(probe);
+//	m_ownsProbeResource = true;
 
 	/* Register the sampler with the scheduler if needed */
 	if (samplerResID == -1) {
@@ -82,6 +86,8 @@ RenderJob::~RenderJob() {
 		sched->unregisterResource(m_samplerResID);
 	if (m_ownsSensorResource)
 		sched->unregisterResource(m_sensorResID);
+//	if (m_ownsProbeResource)
+//		sched->unregisterResource(m_probeResID); // Unregister probe from the resource
 }
 
 void RenderJob::run() {

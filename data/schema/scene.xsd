@@ -1,9 +1,11 @@
 <?xml version="1.0" ?>
 <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+
 	<!-- SCENE Element -->
 	<xsd:element name="scene">
 		<xsd:complexType>
 			<xsd:choice minOccurs="0" maxOccurs="unbounded">
+				<xsd:element name="probe" type="probe"/>
 				<xsd:element name="sensor" type="sensor"/>
 				<xsd:element name="texture" type="texture"/>
 				<xsd:element name="bsdf" type="bsdf"/>
@@ -28,6 +30,7 @@
 				<xsd:element name="blackbody" type="blackbody"/>
 
 				<xsd:element name="alias" type="alias"/>
+				<xsd:element name="disparity" type="disparity"/>
 				<xsd:element name="default" type="string"/>
 			</xsd:choice>
 			<xsd:attribute name="version" type="xsd:string"/>
@@ -50,6 +53,7 @@
 			<xsd:element name="rgb" type="rgb"/>
 			<xsd:element name="srgb" type="string"/>
 			<xsd:element name="blackbody" type="blackbody"/>
+			<xsd:element name="disparity" type="disparity"/>
 			<xsd:element name="default" type="string"/>
 		</xsd:choice>
 	</xsd:group>
@@ -110,6 +114,20 @@
 			</xsd:extension>
 		</xsd:complexContent>
 	</xsd:complexType>
+
+	<!-- Probe Element -->
+	<xsd:complexType name="probe">
+		<xsd:complexContent>
+			<xsd:extension base="objectBase">
+				<xsd:choice minOccurs="0" maxOccurs="unbounded">
+					<xsd:group ref="objectGroup"/>
+					<xsd:element name="probe" type="probe"/>
+				</xsd:choice>
+			</xsd:extension>
+		</xsd:complexContent>
+
+	</xsd:complexType>
+
 
 	<!-- EMITTER Element -->
 	<xsd:complexType name="emitter">
@@ -321,6 +339,11 @@
 	<xsd:complexType name="alias">
 		<xsd:attribute name="id" type="xsd:string" use="required"/>
 		<xsd:attribute name="as" type="xsd:string" use="required"/>
+	</xsd:complexType>
+
+	<xsd:complexType name="disparity">
+		<xsd:attribute name="x" type="doubleType" use="optional"/>
+		<xsd:attribute name="y" type="doubleType" use="optional"/>
 	</xsd:complexType>
 
 	<xsd:complexType name="transform">

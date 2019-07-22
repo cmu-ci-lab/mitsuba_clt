@@ -21,7 +21,7 @@
 #define __MITSUBA_BIDIR_VERTEX_H_
 
 #include <mitsuba/bidir/common.h>
-#include <mitsuba/bidir/probe.h>
+#include <mitsuba/render/probe.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -276,7 +276,7 @@ struct MTS_EXPORT_BIDIR PathVertex {
 		const PathVertex *pred, const PathEdge *predEdge,
 		PathEdge *succEdge, PathVertex *succ,
 		ETransportMode mode, bool russianRoulette = false,
-		Spectrum *throughput = NULL, uint32_t probeType = Probe::ENORMAL);
+		Spectrum *throughput = NULL); //const Point2i &pixelPosition_ = NULL
 
 	/**
 	 * \brief \a Direct sampling: given the current vertex as a reference
@@ -346,7 +346,8 @@ struct MTS_EXPORT_BIDIR PathVertex {
 	 */
 		Spectrum sampleDirect(const Scene *scene, Sampler *sampler,
 													PathVertex *endpoint, PathEdge *edge, PathVertex *sample,
-													ETransportMode mode, const Point2 &PixelPosition, uint32_t probeType = Probe::ENORMAL) const;
+													ETransportMode mode, const Point2 &PixelPosition,
+													const Point2 &cameraUV) const;
 
 	/**
 	 * \brief Sample the first vertices on a sensor subpath such that
@@ -384,21 +385,15 @@ struct MTS_EXPORT_BIDIR PathVertex {
 	 *    were successfully filled)
 	 */
 	int sampleSensor(const Scene *scene, Sampler *sampler, const Point2i &pixelPosition,
-		PathEdge *e0, PathVertex *v1, PathEdge *e1, PathVertex *v2, uint32_t probeType = Probe::ENORMAL);
+		PathEdge *e0, PathVertex *v1, PathEdge *e1, PathVertex *v2); //const Probe *probe
 
-	/**
-	 * Added to support probing
-	 * @param scene
-	 * @param sampler
-	 * @param pixelPosition
-	 * @param e0
-	 * @param v1
-	 * @param e1
-	 * @param v2
-	 * @return
-	 */
-	int sampleEmitterWS(const Scene *scene, Sampler *sampler, const Point2i &pixelPosition,
-		PathEdge *e0, PathVertex *v1, PathEdge *e1, PathVertex *v2, Probe::EProbeType probeType);
+	int sampleSensorWithProbing(const Scene *scene, Sampler *sampler, const Point2i &pixelPosition,
+					 PathEdge *e0, PathVertex *v1, PathEdge *e1, PathVertex *v2, Point3 &pixelWorldPosition);
+
+
+
+	int sampleEmitterFromPixelWithProbing(const Scene *scene, Sampler *sampler, const Point2i &pixelPosition,
+						PathEdge *e0, PathVertex *v1, PathEdge *e1, PathVertex *v2, const Point3 &origin);
 
 	/**
 	 * \brief Create a perturbed successor vertex and edge
@@ -528,7 +523,7 @@ struct MTS_EXPORT_BIDIR PathVertex {
 	 * \return The contribution weighting factor
 	 */
 	Spectrum eval(const Scene *scene, const PathVertex *pred,
-		const PathVertex *succ, ETransportMode mode, EMeasure measure = EArea,	Probe::EProbeType probe = Probe::ENORMAL) const;
+		const PathVertex *succ, ETransportMode mode, EMeasure measure = EArea) const;
 
 	/**
 	 * \brief Compute the density of a successor node

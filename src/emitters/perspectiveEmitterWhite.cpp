@@ -132,6 +132,19 @@ MTS_NAMESPACE_BEGIN
             stream->writeFloat(m_scale);
         }
 
+        void configureProbe(Stream *stream) const{
+            stream->writeFloat(m_scale);
+//        printf("stream size %ld\n",stream->getSize());
+            stream->writeFloat(m_nearClip);
+            stream->writeFloat(m_farClip);
+            stream->writeFloat(m_normalization);
+            m_resolution.serialize(stream);
+            m_worldTransform->serialize(stream);
+            m_cameraToSample.serialize(stream);
+            m_sampleToCamera.serialize(stream);
+            m_imageRect.serialize(stream);
+        }
+
         void configure() {
             PerspectiveEmitter::configure();
             m_size.x = m_width;
@@ -207,7 +220,7 @@ MTS_NAMESPACE_BEGIN
             */
 
             Float cosTheta = Frame::cosTheta(d);
-
+//            printf("cosTheta %f\n",cosTheta);
             /* Check if the direction points behind the emitter */
             if (cosTheta <= 0)
                 return 0.0f;
@@ -304,7 +317,8 @@ MTS_NAMESPACE_BEGIN
             const Transform &trafo = m_worldTransform->eval(pRec.time);
 
             Vector v = trafo.inverse()(dRec.d);
-
+//            Spectrum result = importance(v) * Spectrum(m_scale * m_invResolution.x * m_invResolution.y);
+//            printf("all white emitter eval direction result %f %f %f\n", result[0],result[1],result[2]);
             return importance(v) * Spectrum(m_scale);
         }
 

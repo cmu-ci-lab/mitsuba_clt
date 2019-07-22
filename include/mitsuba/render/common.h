@@ -21,6 +21,7 @@
 #define __MITSUBA_RENDER_COMMON_H_
 
 #include <mitsuba/core/ray.h>
+#include <mitsuba/core/transform.h>
 //#include <mitsuba/render/probe.h>
 
 MTS_NAMESPACE_BEGIN
@@ -113,7 +114,18 @@ public:
 	 */
 	Point2 uv;
 
-  uint32_t probeType = 0x00;
+	/**
+	 * \brief Optional: Define the Probing type
+	 */
+  uint32_t probeType=0;
+
+  Point2 cameraUV;
+
+  Point3 worldCameraSample;
+
+  float epiLineLen;
+
+  Point epiline;
 
 	/**
 	 * \brief Optional: Pointer to an associated object
@@ -124,6 +136,7 @@ public:
 	 * a pointer to this object.
 	 */
 	const ConfigurableObject *object;
+
 public:
 	/// Create an invalid position sampling record
 	inline PositionSamplingRecord() { }
@@ -137,7 +150,7 @@ public:
 	 *    position sample. This only matters when things are in motion
 	 */
 	inline PositionSamplingRecord(Float time) : time(time),
-		uv(0.0f), object(NULL) { }
+		uv(0.0f), object(NULL){ }
 
 	/**
 	 * \brief Create a position sampling record
@@ -182,6 +195,8 @@ public:
 	/* record the location of the sampling point on the perspective
  * camera or orthographic camera*/
 	Point2 planePosition;
+
+	bool isUniformSample=false;
 
 public:
 	/// Return a human-readable description of the record

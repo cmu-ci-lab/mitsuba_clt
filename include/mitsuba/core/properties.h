@@ -66,7 +66,9 @@ public:
 		/// Arbitrary-length string
 		EString,
 		/// Arbitrary data (pointer+size)
-		EData
+		EData,
+		/// Disparity
+		EDisparity
 	};
 
 	/// Simple pointer-size pair for passing arbitrary data (e.g. between plugins)
@@ -183,6 +185,13 @@ public:
 	Vector getVector(const std::string &name) const;
 	/// Get a 3d vector (with default)
 	Vector getVector(const std::string &name, const Vector &defVal) const;
+
+	/// Set a Disparity
+	void setDisparity(const std::string &name, const Vector2i &value, bool warnDuplicates = true);
+	/// Get a Disparity
+	Vector2i getDisparity(const std::string &name) const;
+	/// Get a Disparity (with default)
+	Vector2i getDisparity(const std::string &name, const Vector2i &defVal) const;
 
 	/// Set a string
 	void setString(const std::string &name, const std::string &value, bool warnDuplicates = true);

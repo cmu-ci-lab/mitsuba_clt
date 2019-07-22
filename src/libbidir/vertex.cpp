@@ -35,7 +35,7 @@ void PathVertex::makeEndpoint(const Scene *scene, Float time, ETransportMode mod
 bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 							 const PathVertex *pred, const PathEdge *predEdge,
 							 PathEdge *succEdge, PathVertex *succ,
-							 ETransportMode mode, bool russianRoulette, Spectrum *throughput, uint32_t probeType) {
+							 ETransportMode mode, bool russianRoulette, Spectrum *throughput) {
 		Ray ray;
 
 		memset(succEdge, 0, sizeof(PathEdge));
@@ -50,7 +50,6 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 				PositionSamplingRecord &pRec = succ->getPositionSamplingRecord();
 				const EndpointRecord &eRec = getEndpointRecord();
 				pRec = PositionSamplingRecord(eRec.time);
-				pRec.probeType = probeType;
 				Spectrum result = scene->sampleEmitterPosition(pRec, sampler->next2D());
 				if (result.isZero())
 					return false;
@@ -75,7 +74,6 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 				PositionSamplingRecord &pRec = succ->getPositionSamplingRecord();
 				const EndpointRecord &eRec = getEndpointRecord();
 				pRec = PositionSamplingRecord(eRec.time);
-        pRec.probeType = probeType;
 				Spectrum result = scene->sampleSensorPosition(pRec, sampler->next2D());
 				if (result.isZero())
 					return false;
@@ -101,10 +99,8 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 				PositionSamplingRecord &pRec = getPositionSamplingRecord();
 				const Emitter *emitter = static_cast<const Emitter *>(pRec.object);
 				DirectionSamplingRecord dRec;
-
 				Spectrum result = emitter->sampleDirection(dRec, pRec,
 														   emitter->needsDirectionSample() ? sampler->next2D() : Point2(0.5f));
-
 				if (result.isZero())
 					return false;
 
@@ -127,10 +123,8 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 				PositionSamplingRecord &pRec = getPositionSamplingRecord();
 				const Sensor *sensor = static_cast<const Sensor *>(pRec.object);
 				DirectionSamplingRecord dRec;
-
 				Spectrum result = sensor->sampleDirection(dRec, pRec,
 														  sensor->needsDirectionSample() ? sampler->next2D() : Point2(0.5f));
-
 				if (result.isZero())
 					return false;
 
@@ -153,7 +147,6 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 				const BSDF *bsdf = its.getBSDF();
 				Vector wi = normalize(pred->getPosition() - its.p);
 				Vector wo;
-
 				/* Sample the BSDF */
 				BSDFSamplingRecord bRec(its, sampler, mode);
 				bRec.wi = its.toLocal(wi);
@@ -264,7 +257,6 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 						"unsupported vertex type (%i)!", type);
 				return false;
 		}
-
 		if (throughput) {
 			/* For BDPT: keep track of the path throughput to run russian roulette */
 			(*throughput) *= weight[mode];
@@ -281,7 +273,6 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 				}
 			}
 		}
-
 		if (!succEdge->sampleNext(scene, sampler, this, ray, succ, mode)) {
 			/* Sampling a successor edge + vertex failed, hence the vertex
                is not committed to a particular measure yet -- revert. */
@@ -291,28 +282,27 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 			if (throughput)
 				(*throughput) *= succEdge->weight[mode];
 		}
-
 		/* Convert from solid angle to area measure */
 		if (measure == ESolidAngle) {
 			measure = EArea;
-
+            assert(succEdge); assert(succ);
 			pdf[mode] /= succEdge->length * succEdge->length;
 			if (succ->isOnSurface())
 				pdf[mode] *= absDot(ray.d, succ->getGeometricNormal());
-
+			assert(predEdge); assert(pred != NULL);
 			if (predEdge->length != 0.0f) {
 				pdf[1-mode] /= predEdge->length * predEdge->length;
+				pred->isOnSurface();
 				if (pred->isOnSurface())
-					pdf[1-mode] *= absDot(predEdge->d, pred->getGeometricNormal());
+                    pdf[1 - mode] *= absDot(predEdge->d, pred->getGeometricNormal());
 			}
 		}
-
 		return true;
 	}
 
 int PathVertex::sampleSensor(const Scene *scene, Sampler *sampler,
 		const Point2i &pixelPosition_, PathEdge *e0, PathVertex *v1,
-		PathEdge *e1, PathVertex *v2, uint32_t probeType) {
+		PathEdge *e1, PathVertex *v2) {
 	BDAssert(type == ESensorSupernode);
 	const EndpointRecord &eRec = getEndpointRecord();
 	const Sensor *sensor = scene->getSensor();
@@ -328,7 +318,8 @@ int PathVertex::sampleSensor(const Scene *scene, Sampler *sampler,
 	pRec = PositionSamplingRecord(eRec.time);
 
 	//Pass type to the sensor
-	pRec.probeType = probeType;
+	//pRec.probeType = probeType;
+  	pRec.cameraUV = pixelPosition;
 
 	Spectrum result = scene->sampleSensorPosition(pRec,
 		(sensor->getType() & Sensor::EPositionSampleMapsToPixels) ? pixelSample
@@ -344,16 +335,25 @@ int PathVertex::sampleSensor(const Scene *scene, Sampler *sampler,
 	measure = pRec.measure;
 	rrWeight = 1.0f;
 	v1->type = ESensorSample;
-  v1->degenerate = sensor->getType() & Sensor::EDeltaDirection;
+  	v1->degenerate = sensor->getType() & Sensor::EDeltaDirection;
 
 	e0->weight[ERadiance] = Spectrum(1.0f);
 	e0->pdf[ERadiance] = 1.0f;
 	e0->medium = sensor->getMedium();
 
 	DirectionSamplingRecord dRec;
-	result = sensor->sampleDirection(dRec, pRec,
-		(sensor->getType() & Sensor::EPositionSampleMapsToPixels) ? apertureSample
-		: pixelSample, &pixelPosition);
+	const Probe *probe = scene->getProbe();
+	if(probe != NULL) {
+		result = probe->sampleCameraDirection(dRec, pRec,
+				(sensor->getType() & Sensor::EPositionSampleMapsToPixels) ? apertureSample: pixelSample,
+				&pixelPosition);
+	}
+	else {
+		result = sensor->sampleDirection(dRec, pRec,
+										 (sensor->getType() & Sensor::EPositionSampleMapsToPixels) ? apertureSample
+																								   : pixelSample,
+										 &pixelPosition);
+	}
 	if (result.isZero())
 		return 1;
 
@@ -390,106 +390,184 @@ int PathVertex::sampleSensor(const Scene *scene, Sampler *sampler,
 	return 2;
 }
 
-    int PathVertex::sampleEmitterWS(const Scene *scene, Sampler *sampler,
-                                    const Point2i &pixelPosition_, PathEdge *e0, PathVertex *v1,
-                                    PathEdge *e1, PathVertex *v2,Probe::EProbeType probeType) {
-        BDAssert(type == EEmitterSupernode);
-        const EndpointRecord &eRec = getEndpointRecord();
-        Point2 pixelPosition(pixelPosition_);
+int PathVertex::sampleSensorWithProbing(const Scene *scene, Sampler *sampler, const Point2i &pixelPosition_,
+                            PathEdge *e0, PathVertex *v1, PathEdge *e1, PathVertex *v2, Point3 &pixelWorldPosition){
+    BDAssert(type == ESensorSupernode);
+    const EndpointRecord &eRec = getEndpointRecord();
+    const Sensor *sensor = scene->getSensor();
+    Point2 pixelPosition(pixelPosition_);
 
-        memset(e0, 0, sizeof(PathEdge));
-        memset(v1, 0, sizeof(PathVertex));
+    memset(e0, 0, sizeof(PathEdge));
+    memset(v1, 0, sizeof(PathVertex));
 
-        Point2 pixelSample = sampler->next2D(),
-               emitterPos = pixelPosition;
+    Point2 pixelSample = sampler->next2D(),
+            apertureSample = sensor->needsApertureSample() ? sampler->next2D() : Point2(0.5f);
 
-        PositionSamplingRecord &pRec = v1->getPositionSamplingRecord();
-        pRec = PositionSamplingRecord(eRec.time);
+    PositionSamplingRecord &pRec = v1->getPositionSamplingRecord();
+    pRec = PositionSamplingRecord(eRec.time);
 
-        //Pass type to the emitter
-        pRec.probeType = probeType;
-        Float newPdf;
+    //Pass type to the sensor
+    //pRec.probeType = probeType;
+    pRec.cameraUV = pixelPosition;
 
-        switch(probeType){
-            case Probe::EIDENTITY: {
-                break;
-            }
-            case Probe::EDISPARITY:{
-                break;
-            }
-            case Probe::EROW:{
-                const Vector2i filmsize = scene->getSensor()->getFilm()->getSize();
-                emitterPos.x = (int)std::ceil(filmsize.x * sampler->next1D());
-                emitterPos.y = pixelPosition.y;
-                break;
-            }
-            case Probe::ECOLUMN:{
-                const Vector2i filmsize = scene->getSensor()->getFilm()->getSize();
-                emitterPos.x = pixelPosition.x;
-                emitterPos.y = (int)std::ceil(filmsize.y * sampler->next1D());
-                break;
-            }
-            default:{
-            }
+    Spectrum result = scene->sampleSensorPosition(pRec,
+                                                  (sensor->getType() & Sensor::EPositionSampleMapsToPixels) ? pixelSample
+                                                   : apertureSample, &pixelPosition);
 
-        }
-        Spectrum result = scene->sampleProjectiveEmitterPosition(pRec, pixelSample, &emitterPos);
-
-        if (result.isZero())
-            return 0;
-
-        const ref_vector<Emitter> &emitters = scene->getEmitters();
-        const Emitter *emitter = emitters[0].get();
-
-        weight[EImportance] = result;
-        pdf[EImportance] = pRec.pdf;
-        measure = pRec.measure;
-        rrWeight = 1.0f;
-        v1->type = EEmitterSample;
-        v1->degenerate = emitter->getType() & Emitter::EDeltaDirection;
-
-        e0->weight[EImportance] = Spectrum(1.0f);
-        e0->pdf[EImportance] = 1.0f;
-        e0->medium = emitter->getMedium();
-
-        DirectionSamplingRecord dRec;
-        result = emitter->sampleDirection(dRec, pRec, pixelSample, &emitterPos);
-        if (result.isZero())
-            return 1;
-
-        memset(e1, 0, sizeof(PathEdge));
-        memset(v2, 0, sizeof(PathVertex));
-
-        v1->weight[ERadiance] = result * dRec.pdf * (
-                emitter->isOnSurface() ? 1.0f / absDot(dRec.d, pRec.n) : 1.0f);
-        v1->weight[EImportance]   = result;
-        v1->pdf[ERadiance]    = 1.0f;
-        v1->pdf[EImportance]  = dRec.pdf;
-		    v1->rrWeight = 1.0f;
-        v1->uv = pRec.uv;
-
-        v1->measure = dRec.measure;
-        e1->medium = emitter->getMedium();
-
-        Ray ray;
-        ray.time = pRec.time;
-        ray.setOrigin(pRec.p);
-        ray.setDirection(dRec.d);
-
-        if (!e1->sampleNext(scene, sampler, v1, ray, v2, EImportance)) {
-            v1->measure = EInvalidMeasure;
-            return 1;
-        }
-
-        if (v1->measure == ESolidAngle) {
-            v1->measure = EArea;
-            v1->pdf[EImportance] /= e1->length * e1->length;
-            if (v2->isOnSurface())
-                v1->pdf[EImportance] *= absDot(ray.d, v2->getGeometricNormal());
-        }
-
-        return 2;
+    //Changed to make bdpt coded camera able to have zero value ray
+    if (result.isZero() && !(sensor->getType() & Sensor::ECodedOrtho)){
+        return 0;
     }
+
+    weight[ERadiance] = result;
+    pdf[ERadiance] = pRec.pdf;
+    measure = pRec.measure;
+    rrWeight = 1.0f;
+    v1->type = ESensorSample;
+    v1->degenerate = sensor->getType() & Sensor::EDeltaDirection;
+
+    e0->weight[ERadiance] = Spectrum(1.0f);
+    e0->pdf[ERadiance] = 1.0f;
+    e0->medium = sensor->getMedium();
+
+    DirectionSamplingRecord dRec;
+    const Probe *probe = scene->getProbe();
+    if(probe != NULL) {
+        result = probe->sampleCameraDirection(dRec, pRec,
+                                              (sensor->getType() & Sensor::EPositionSampleMapsToPixels) ?
+                                              apertureSample: pixelSample,
+                                              &pixelPosition);
+    }
+    else {
+        result = sensor->sampleDirection(dRec, pRec,
+                                         (sensor->getType() & Sensor::EPositionSampleMapsToPixels) ? apertureSample
+                                                                                                   : pixelSample,
+                                         &pixelPosition);
+    }
+
+	pixelWorldPosition = pRec.worldCameraSample;
+    if (result.isZero())
+        return 1;
+
+    memset(e1, 0, sizeof(PathEdge));
+    memset(v2, 0, sizeof(PathVertex));
+    v1->weight[EImportance] = result * dRec.pdf * (
+            sensor->isOnSurface() ? 1.0f / absDot(dRec.d, pRec.n) : 1.0f);
+    v1->weight[ERadiance]   = result;
+    v1->pdf[EImportance]    = 1.0f;
+    v1->pdf[ERadiance]      = dRec.pdf;
+    v1->rrWeight = 1.0f;
+    v1->uv = pRec.uv;
+
+    v1->measure = dRec.measure;
+    e1->medium = sensor->getMedium();
+
+    Ray ray;
+    ray.time = pRec.time;
+    ray.setOrigin(pRec.p);
+    ray.setDirection(dRec.d);
+
+    if (!e1->sampleNext(scene, sampler, v1, ray, v2, ERadiance)) {
+        v1->measure = EInvalidMeasure;
+        return 1;
+    }
+
+    if (v1->measure == ESolidAngle) {
+        v1->measure = EArea;
+        v1->pdf[ERadiance] /= e1->length * e1->length;
+        if (v2->isOnSurface())
+            v1->pdf[ERadiance] *= absDot(ray.d, v2->getGeometricNormal());
+    }
+
+    return 2;
+}
+
+int PathVertex::sampleEmitterFromPixelWithProbing(const Scene *scene, Sampler *sampler,
+									  const Point2i &pixelPosition_,
+									  PathEdge *e0, PathVertex *v1,
+									  PathEdge *e1, PathVertex *v2, const Point3 &cameraSample) {
+	const EndpointRecord &eRec = getEndpointRecord();
+	Point2 pixelPosition(pixelPosition_);
+
+	memset(e0, 0, sizeof(PathEdge));
+	memset(v1, 0, sizeof(PathVertex));
+
+	Point2 pixelSample = sampler->next2D(),
+			emitterPos = pixelPosition;
+
+	PositionSamplingRecord &pRec = v1->getPositionSamplingRecord();
+	pRec = PositionSamplingRecord(eRec.time);
+
+	const Probe *probe = scene->getProbe();
+	pRec.cameraUV = emitterPos; //Pass type to the emitter
+	pRec.worldCameraSample = cameraSample;
+
+	Spectrum result;
+	result = scene->sampleProjectiveEmitterPosition(pRec, sampler, pixelSample, &emitterPos);
+
+
+	if (result.isZero())
+		return 0;
+
+	const ref_vector<Emitter> &emitters = scene->getEmitters();
+	const Emitter *emitter = emitters[0].get();
+
+	weight[EImportance] = result;
+	pdf[EImportance] = pRec.pdf;
+	measure = pRec.measure;
+	rrWeight = 1.0f;
+	v1->type = EEmitterSample;
+	v1->degenerate = emitter->getType() & Emitter::EDeltaDirection;
+
+	e0->weight[EImportance] = Spectrum(1.0f);
+	e0->pdf[EImportance] = 1.0f;
+	e0->medium = emitter->getMedium();
+
+	DirectionSamplingRecord dRec;
+
+	if(probe != NULL){
+		result = probe->sampleProjectorDirection(dRec, pRec, sampler, pixelSample, &emitterPos);
+	} else{
+		result = emitter->sampleDirection(dRec, pRec, pixelSample);
+	}
+
+	if (result.isZero())
+		return 1;
+
+	memset(e1, 0, sizeof(PathEdge));
+	memset(v2, 0, sizeof(PathVertex));
+
+	v1->weight[ERadiance] = result * dRec.pdf * (
+			emitter->isOnSurface() ? 1.0f / absDot(dRec.d, pRec.n) : 1.0f);
+	v1->weight[EImportance]   = result;
+	v1->pdf[ERadiance]    = 1.0f;
+	v1->pdf[EImportance]  = dRec.pdf;
+	v1->rrWeight = 1.0f;
+	v1->uv = pRec.uv;
+
+	v1->measure = dRec.measure;
+	e1->medium = emitter->getMedium();
+
+	Ray ray;
+	ray.time = pRec.time;
+	ray.setOrigin(pRec.p);
+	ray.setDirection(dRec.d);
+
+	if (!e1->sampleNext(scene, sampler, v1, ray, v2, EImportance)) {
+		v1->measure = EInvalidMeasure;
+		return 1;
+	}
+
+	if (v1->measure == ESolidAngle) {
+		v1->measure = EArea;
+		v1->pdf[EImportance] /= e1->length * e1->length;
+		if (v2->isOnSurface())
+			v1->pdf[EImportance] *= absDot(ray.d, v2->getGeometricNormal());
+	}
+
+	return 2;
+
+}
 
 	bool PathVertex::perturbPosition(const Scene *scene, Sampler *sampler, Float stddev) {
 	Point2 step = warp::squareToStdNormal(sampler->next2D()) * stddev;
@@ -888,136 +966,147 @@ bool PathVertex::propagatePerturbation(const Scene *scene, const PathVertex *pre
 }
 
 Spectrum PathVertex::eval(const Scene *scene, const PathVertex *pred,
-		const PathVertex *succ, ETransportMode mode, EMeasure measure, Probe::EProbeType probe) const {
+						  const PathVertex *succ, ETransportMode mode, EMeasure measure) const {
 	Spectrum result(0.0f);
 	Vector wo(0.0f);
-
+	const Probe *probe = scene->getProbe();
 	switch (type) {
 		case EEmitterSupernode: {
-				if (mode != EImportance || pred != NULL || succ->type != EEmitterSample)
-					return Spectrum(0.0f);
-				PositionSamplingRecord pRec = succ->getPositionSamplingRecord();
-				const Emitter *emitter = static_cast<const Emitter *>(pRec.object);
-				pRec.measure = measure;
-				return emitter->evalPosition(pRec);
-			}
+			if (mode != EImportance || pred != NULL || succ->type != EEmitterSample)
+				return Spectrum(0.0f);
+			PositionSamplingRecord pRec = succ->getPositionSamplingRecord();
+			const Emitter *emitter = static_cast<const Emitter *>(pRec.object);
+			pRec.measure = measure;
+			if(probe != NULL)
+				return probe->evalProjectorPosition(pRec);
+			return emitter->evalPosition(pRec);
+		}
 			break;
 
 		case ESensorSupernode: {
-				if (mode != ERadiance || pred != NULL || succ->type != ESensorSample)
-					return Spectrum(0.0f);
-				PositionSamplingRecord pRec = succ->getPositionSamplingRecord();
-				const Sensor *sensor = static_cast<const Sensor *>(pRec.object);
-				pRec.measure = measure;
-				return sensor->evalPosition(pRec);
-			}
+			if (mode != ERadiance || pred != NULL || succ->type != ESensorSample)
+				return Spectrum(0.0f);
+			PositionSamplingRecord pRec = succ->getPositionSamplingRecord();
+			const Sensor *sensor = static_cast<const Sensor *>(pRec.object);
+			pRec.measure = measure;
+			if(probe != NULL)
+				return probe->evalCameraPosition(pRec);
+			return sensor->evalPosition(pRec);
+		}
 			break;
 
 		case EEmitterSample: {
-				Point target;
-				if (mode == EImportance && pred->type == EEmitterSupernode)
-					target = succ->getPosition();
-				else if (mode == ERadiance && succ->type == EEmitterSupernode)
-					target = pred->getPosition();
-				else
-					return Spectrum(0.0f);
+			Point target;
+			if (mode == EImportance && pred->type == EEmitterSupernode)
+				target = succ->getPosition();
+			else if (mode == ERadiance && succ->type == EEmitterSupernode)
+				target = pred->getPosition();
+			else
+				return Spectrum(0.0f);
+			const PositionSamplingRecord &pRec = getPositionSamplingRecord();
 
-				const PositionSamplingRecord &pRec = getPositionSamplingRecord();
-				const Emitter *emitter = static_cast<const Emitter *>(pRec.object);
-				wo = normalize(target - pRec.p);
-				DirectionSamplingRecord dRec(wo, measure == EArea ? ESolidAngle : measure);
+			const Emitter *emitter = static_cast<const Emitter *>(pRec.object);
+			wo = normalize(target - pRec.p);
+			DirectionSamplingRecord dRec(wo, measure == EArea ? ESolidAngle : measure);
+			if(probe != NULL)
+				result = probe->evalProjectorDirection(dRec, pRec);
+			else
 				result = emitter->evalDirection(dRec, pRec);
-				Float dp = absDot(pRec.n, wo);
-				if (measure != EDiscrete && dp != 0 && probe!=Probe::EDISPARITY )
-          result /= dp;
+			Float dp = absDot(pRec.n, wo);
+			if (measure != EDiscrete && dp != 0 && (probe == NULL || probe->getType().compare("disparity") != 0))
+				result /= dp;
 
-			}
+		}
 			break;
 
 		case ESensorSample: {
-				Point target;
-				if (mode == ERadiance && pred->type == ESensorSupernode)
-					target = succ->getPosition();
-				else if (mode == EImportance && succ->type == ESensorSupernode)
-					target = pred->getPosition();
-				else
-					return Spectrum(0.0f);
+			Point target;
+			if (mode == ERadiance && pred->type == ESensorSupernode)
+				target = succ->getPosition();
+			else if (mode == EImportance && succ->type == ESensorSupernode)
+				target = pred->getPosition();
+			else
+				return Spectrum(0.0f);
 
-				const PositionSamplingRecord &pRec = getPositionSamplingRecord();
-				const Sensor *sensor = static_cast<const Sensor *>(pRec.object);
-				wo = normalize(target - pRec.p);
-				DirectionSamplingRecord dRec(wo, measure == EArea ? ESolidAngle : measure);
+			const PositionSamplingRecord &pRec = getPositionSamplingRecord();
+			const Sensor *sensor = static_cast<const Sensor *>(pRec.object);
+			wo = normalize(target - pRec.p);
+			DirectionSamplingRecord dRec(wo, measure == EArea ? ESolidAngle : measure);
+			if(probe != NULL)
+				result = probe->evalCameraDirection(dRec, pRec);
+			else
 				result = sensor->evalDirection(dRec, pRec);
-				Float dp = absDot(pRec.n, wo);
-			if (measure != EDiscrete && dp != 0 && probe!=Probe::EDISPARITY) {
-        result /= dp;
-      }
-
-				return result;
+			Float dp = absDot(pRec.n, wo);
+			if (measure != EDiscrete && dp != 0 && (probe == NULL || probe->getType().compare("disparity") != 0)) {
+				result /= dp;
 			}
+
+			return result;
+		}
 			break;
 
 		case ESurfaceInteraction: {
-				const Intersection &its = getIntersection();
-				const BSDF *bsdf = its.getBSDF();
+			const Intersection &its = getIntersection();
+			const BSDF *bsdf = its.getBSDF();
 
-				Point predP = pred->getPosition(),
-					  succP = succ->getPosition();
+			Point predP = pred->getPosition(),
+					succP = succ->getPosition();
 
-				Vector wi = normalize(predP - its.p);
-				wo = normalize(succP - its.p);
+			Vector wi = normalize(predP - its.p);
+			wo = normalize(succP - its.p);
 
-				BSDFSamplingRecord bRec(its, its.toLocal(wi),
-						its.toLocal(wo), mode);
+			BSDFSamplingRecord bRec(its, its.toLocal(wi),
+									its.toLocal(wo), mode);
 
-				if (measure == EArea)
-					measure = ESolidAngle;
+			if (measure == EArea)
+				measure = ESolidAngle;
 
-				result = bsdf->eval(bRec, measure);
+			result = bsdf->eval(bRec, measure);
 
-				/* Prevent light leaks due to the use of shading normals */
-				Float wiDotGeoN = dot(its.geoFrame.n, wi),
-				      woDotGeoN = dot(its.geoFrame.n, wo);
+			/* Prevent light leaks due to the use of shading normals */
+			Float wiDotGeoN = dot(its.geoFrame.n, wi),
+					woDotGeoN = dot(its.geoFrame.n, wo);
 
-				if (wiDotGeoN * Frame::cosTheta(bRec.wi) <= 0 ||
-					woDotGeoN * Frame::cosTheta(bRec.wo) <= 0)
-					return Spectrum(0.0f);
+			if (wiDotGeoN * Frame::cosTheta(bRec.wi) <= 0 ||
+				woDotGeoN * Frame::cosTheta(bRec.wo) <= 0)
+				return Spectrum(0.0f);
 
 			//changed to adapt to disparity camera
-				if (mode == EImportance  && probe!=Probe::EDISPARITY) {
-					/* Adjoint BSDF for shading normals */
-					result *= std::abs(
+			if (mode == EImportance && (probe == NULL || probe->getType().compare("disparity") != 0)) {
+				/* Adjoint BSDF for shading normals */
+				result *= std::abs(
 						(Frame::cosTheta(bRec.wi) * woDotGeoN) /
 						(Frame::cosTheta(bRec.wo) * wiDotGeoN));
-				}
-			//changed to adapt to disparity camera
-				if (measure != EDiscrete && Frame::cosTheta(bRec.wo) != 0  && probe!=Probe::EDISPARITY)
-					result /= std::abs(Frame::cosTheta(bRec.wo));
 			}
+			//changed to adapt to disparity camera
+			if (measure != EDiscrete && Frame::cosTheta(bRec.wo) != 0 &&
+				(probe == NULL || probe->getType().compare("disparity") != 0))
+				result /= std::abs(Frame::cosTheta(bRec.wo));
+		}
 			break;
 
 		case EMediumInteraction: {
-				if (measure != ESolidAngle && measure != EArea)
-					return Spectrum(0.0f);
+			if (measure != ESolidAngle && measure != EArea)
+				return Spectrum(0.0f);
 
-				const MediumSamplingRecord &mRec = getMediumSamplingRecord();
+			const MediumSamplingRecord &mRec = getMediumSamplingRecord();
 
-				Point predP = pred->getPosition(),
-					  succP = succ->getPosition();
+			Point predP = pred->getPosition(),
+					succP = succ->getPosition();
 
-				Vector wi = normalize(predP - mRec.p);
-				wo = normalize(succP - mRec.p);
+			Vector wi = normalize(predP - mRec.p);
+			wo = normalize(succP - mRec.p);
 
-				const PhaseFunction *phase = mRec.medium->getPhaseFunction();
-				PhaseFunctionSamplingRecord pRec(mRec, wi, wo, mode);
+			const PhaseFunction *phase = mRec.medium->getPhaseFunction();
+			PhaseFunctionSamplingRecord pRec(mRec, wi, wo, mode);
 
-				result = mRec.sigmaS * phase->eval(pRec);
-			}
+			result = mRec.sigmaS * phase->eval(pRec);
+		}
 			break;
 
 		default:
 			SLog(EError, "PathVertex::eval(): Encountered an "
-				"unsupported vertex type (%i)!", type);
+						 "unsupported vertex type (%i)!", type);
 			return Spectrum(0.0f);
 	}
 
@@ -1028,6 +1117,7 @@ Float PathVertex::evalPdf(const Scene *scene, const PathVertex *pred,
 		const PathVertex *succ, ETransportMode mode, EMeasure measure) const {
 	Vector wo(0.0f);
 	Float dist = 0.0f, result = 0.0f;
+	const Probe *probe = scene->getProbe();
 
 	switch (type) {
 		case EEmitterSupernode: {
@@ -1059,7 +1149,10 @@ Float PathVertex::evalPdf(const Scene *scene, const PathVertex *pred,
 				wo = succ->getPosition() - pRec.p;
 				dist = wo.length(); wo /= dist;
 				DirectionSamplingRecord dRec(wo, measure == EArea ? ESolidAngle : measure);
-				result = emitter->pdfDirection(dRec, pRec);
+				if(probe != NULL)
+					result = probe->pdfProjectorDirection(dRec, pRec);
+				else
+					result = emitter->pdfDirection(dRec, pRec);
 			}
 			break;
 
@@ -1074,7 +1167,10 @@ Float PathVertex::evalPdf(const Scene *scene, const PathVertex *pred,
 				wo = succ->getPosition() - pRec.p;
 				dist = wo.length(); wo /= dist;
 				DirectionSamplingRecord dRec(wo, measure == EArea ? ESolidAngle : measure);
-				result = sensor->pdfDirection(dRec, pRec);
+				if(probe != NULL)
+					result = probe->pdfCameraDirection(dRec, pRec);
+				else
+					result = sensor->pdfDirection(dRec, pRec);
 			}
 			break;
 
@@ -1200,7 +1296,7 @@ Spectrum PathVertex::sampleDirect(const Scene *scene, Sampler *sampler,
 
 Spectrum PathVertex::sampleDirect(const Scene *scene, Sampler *sampler,
 		PathVertex *endpoint, PathEdge *edge, PathVertex *sample, ETransportMode mode,
-		const Point2 &pixelPosition, uint32_t probeType) const {
+		const Point2 &pixelPosition, const Point2 &cameraUV) const {
 	if (isDegenerate() || isAbsorbing())
 		return Spectrum(0.0f);
 
@@ -1215,17 +1311,22 @@ Spectrum PathVertex::sampleDirect(const Scene *scene, Sampler *sampler,
 	  //create a directSamplingRecord with intersection as the reference point
 	else
 		dRec = DirectSamplingRecord(getPosition(), getTime(), pixelPosition);
-	dRec.probeType = probeType;
+	//dRec.probeType = probeType;
+	dRec.cameraUV = cameraUV;
 
 	Spectrum value;
 	Point2 rsamp(0.5f);
 	if (sampler)
 		rsamp = sampler->next2D();
 
-	if (emitter)
-		value = scene->sampleEmitterDirect(dRec, rsamp, false);
-	else
-		value = scene->sampleSensorDirect(dRec, rsamp, false);
+	if (emitter) {
+//	  if(probeType == Probe::EEPIPOLAR)
+//      scene->sampleSensorDirect(dRec, rsamp, false);
+    value = scene->sampleEmitterDirect(dRec, rsamp, false);
+  }
+	else {
+    value = scene->sampleSensorDirect(dRec, rsamp, false);
+  }
 
 //	SLog(EWarn, "value is zero");
 	if (value.isZero())
@@ -1249,7 +1350,7 @@ Spectrum PathVertex::sampleDirect(const Scene *scene, Sampler *sampler,
 	edge->pdf[mode] = 1.0f;
 	edge->weight[mode] = Spectrum(1.0f);
 
-	sample->type = emitter ? EEmitterSample : ESensorSample;
+	sample->type  = emitter ? EEmitterSample : ESensorSample;
 	sample->degenerate = degenDir;
 	sample->measure = degenDir ? EDiscrete : EArea;
 	sample->getPositionSamplingRecord() = PositionSamplingRecord(dRec);
@@ -1285,9 +1386,14 @@ Float PathVertex::evalPdfDirect(const Scene *scene,
 	dRec.d = sample->getPosition() - getPosition();
 	dRec.dist = dRec.d.length();
 	dRec.d /= dRec.dist;
+	//added by Caroline: this stores the
+	//camera sample inside the direct sampling record
+	dRec.cameraUV = pRec.cameraUV;
+	//dRec.probeType = pRec.probeType;
 
-	if (emitter)
+	if (emitter) {
 		return scene->pdfEmitterDirect(dRec);
+	}
 	else
 		return scene->pdfSensorDirect(dRec);
 }
@@ -1483,14 +1589,23 @@ bool PathVertex::updateSamplePosition(const PathVertex *v) {
 	return sensor->getSamplePosition(pRec, dRec, pRec.uv);
 }
 
+//Caroline: modified from only checking sample position of sensors
+//to checking sample position of emitters
 bool PathVertex::getSamplePosition(const PathVertex *v, Point2 &result) const {
-	BDAssert(isSensorSample());
+	BDAssert(isSensorSample() || isEmitterSample());
 
 	const PositionSamplingRecord &pRec = getPositionSamplingRecord();
-	const Sensor *sensor = static_cast<const Sensor *>(pRec.object);
 	const DirectionSamplingRecord dRec(v->getPosition() - getPosition());
 
-	return sensor->getSamplePosition(pRec, dRec, result);
+	if(isSensorSample()) {
+		const Sensor *sensor = static_cast<const Sensor *>(pRec.object);
+		return sensor->getSamplePosition(pRec, dRec, result);
+	}
+	else if(isEmitterSample()){
+		const Emitter *emitter = static_cast<const Emitter *>(pRec.object);
+		return (!emitter->isPerspectiveEmitter()) || emitter->getSamplePosition(pRec, dRec, result);
+	}
+	return true;
 }
 
 bool PathVertex::connect(const Scene *scene,

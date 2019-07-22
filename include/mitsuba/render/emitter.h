@@ -87,6 +87,12 @@ public:
 	};
 
 	// =============================================================
+	//! @{ \name Probing Configuration interface
+	// =============================================================
+
+	virtual void configureProbe(Stream *stream) const;
+
+	// =============================================================
 	//! @{ \name Sampling interface
 	// =============================================================
 
@@ -366,6 +372,25 @@ public:
 	inline const Shape *getShape() const { return m_shape; }
 
 	/**
+	 * \brief Return the sample position associated with a given
+	 * position and direction sampling record
+	 *
+	 * \param dRec
+	 *    A direction sampling record, which specifies the query direction
+	 *
+	 * \param pRec
+	 *    A position sampling record, which specifies the query position
+	 *
+	 * \return \c true if the specified ray is visible by the camera
+	 *
+	 * \remark
+	 *    In the Python API, the signature of this function is
+	 *    <tt>visible, position = sensor.getSamplePosition(pRec, dRec)</tt>
+	 */
+	virtual bool getSamplePosition(const PositionSamplingRecord &pRec,
+																 const DirectionSamplingRecord &dRec, Point2 &position) const;
+
+	/**
 	 * \brief Create a special shape that represents the emitter
 	 *
 	 * Some types of emitters are inherently associated with a surface, yet
@@ -592,6 +617,9 @@ public:
 	/// Is this an environment emitter? (e.g. an HDRI environment map?)
 	inline bool isEnvironmentEmitter() const { return m_type & EEnvironmentEmitter; }
 
+	/// Is this an environment emitter? (e.g. an HDRI environment map?)
+	inline bool isPerspectiveEmitter() const { return m_type & EPerspectiveEmitter; }
+
 	/**
 	 * \brief Return the radiant emittance from an environment emitter
 	 *
@@ -682,103 +710,110 @@ protected:
  * \ingroup librender
  */
 
-	class MTS_EXPORT_RENDER ProjectiveEmitter : public Emitter {
-        typedef TSpectrum<half, SPECTRUM_SAMPLES> SpectrumHalf;
-        typedef TMIPMap<Spectrum, SpectrumHalf> MIPMap;
+class MTS_EXPORT_RENDER ProjectiveEmitter : public Emitter {
+    typedef TSpectrum<half, SPECTRUM_SAMPLES> SpectrumHalf;
+    typedef TMIPMap<Spectrum, SpectrumHalf> MIPMap;
 
-	public:
-		using Emitter::getWorldTransform;
+public:
+    using Emitter::getWorldTransform;
 
+    // =============================================================
+    //! @{ \name Probing Configuration interface
+    // =============================================================
 
-		/// Return the world-to-view (aka "view") transformation at time \c t
-		inline const Transform getViewTransform(Float t) const {
-			return getWorldTransform()->eval(t).inverse();
-		}
+    void configureProbe(Stream *stream) const;
 
-		/// Return the view-to-world transformation at time \c t
-		inline const Transform getWorldTransform(Float t) const {
-			return getWorldTransform()->eval(t);
-		}
+    /// Return the world-to-view (aka "view") transformation at time \c t
+    inline const Transform getViewTransform(Float t) const {
+        return getWorldTransform()->eval(t).inverse();
+    }
 
-		/**
-         * \brief Overwrite the view-to-world transformation
-         * with a static (i.e. non-animated) transformation.
-         */
-		void setWorldTransform(const Transform &trafo);
+    /// Return the view-to-world transformation at time \c t
+    inline const Transform getWorldTransform(Float t) const {
+        return getWorldTransform()->eval(t);
+    }
 
-		/**
-         * \brief Overwrite the view-to-world transformation
-         * with an animated transformation
-         */
-		void setWorldTransform(AnimatedTransform *trafo);
+    /**
+     * \brief Overwrite the view-to-world transformation
+     * with a static (i.e. non-animated) transformation.
+     */
+    void setWorldTransform(const Transform &trafo);
 
-		/**
-         * \brief Return a projection matrix suitable for rendering the
-         * scene using OpenGL
-         *
-         * For scenes involving a narrow depth of field and antialiasing,
-         * it is necessary to average many separately rendered images using
-         * different pixel offsets and aperture positions.
-         *
-         * \param apertureSample
-         *     Sample for rendering with defocus blur. This should be a
-         *     uniformly distributed random point in [0,1]^2 (or any value
-         *     when \ref needsApertureSample() == \c false)
-         *
-         * \param aaSample
-         *     Sample for antialiasing. This should be a uniformly
-         *     distributed random point in [0,1]^2.
-         */
-		virtual Transform getProjectionTransform(const Point2 &apertureSample,
-												 const Point2 &aaSample) const = 0;
+    /**
+     * \brief Overwrite the view-to-world transformation
+     * with an animated transformation
+     */
+    void setWorldTransform(AnimatedTransform *trafo);
 
-		/// Serialize this camera to a binary data stream
-		virtual void serialize(Stream *stream, InstanceManager *manager) const;
+    /**
+     * \brief Return a projection matrix suitable for rendering the
+     * scene using OpenGL
+     *
+     * For scenes involving a narrow depth of field and antialiasing,
+     * it is necessary to average many separately rendered images using
+     * different pixel offsets and aperture positions.
+     *
+     * \param apertureSample
+     *     Sample for rendering with defocus blur. This should be a
+     *     uniformly distributed random point in [0,1]^2 (or any value
+     *     when \ref needsApertureSample() == \c false)
+     *
+     * \param aaSample
+     *     Sample for antialiasing. This should be a uniformly
+     *     distributed random point in [0,1]^2.
+     */
+    virtual Transform getProjectionTransform(const Point2 &apertureSample,
+                                             const Point2 &aaSample) const = 0;
 
-		/// Return the near clip plane distance
-		inline Float getNearClip() const { return m_nearClip; }
+    /// Serialize this camera to a binary data stream
+    virtual void serialize(Stream *stream, InstanceManager *manager) const;
 
-		/// Set the near clip plane distance
-		void setNearClip(Float nearClip);
+    /// Return the near clip plane distance
+    inline Float getNearClip() const { return m_nearClip; }
 
-		/// Return the far clip plane distance
-		inline Float getFarClip() const { return m_farClip; }
+    /// Set the near clip plane distance
+    void setNearClip(Float nearClip);
 
-		/// Set the far clip plane distance
-		void setFarClip(Float farClip);
+    /// Return the far clip plane distance
+    inline Float getFarClip() const { return m_farClip; }
 
-		/// Return the distance to the focal plane
-		inline Float getFocusDistance() const { return m_focusDistance; }
+    /// Set the far clip plane distance
+    void setFarClip(Float farClip);
 
-		/// Set the distance to the focal plane
-		void setFocusDistance(Float focusDistance);
+    /// Return the distance to the focal plane
+    inline Float getFocusDistance() const { return m_focusDistance; }
 
-		MTS_DECLARE_CLASS()
-	protected:
-		/// Construct a new camera instance
-		ProjectiveEmitter(const Properties &props);
+    /// Set the distance to the focal plane
+    void setFocusDistance(Float focusDistance);
 
-		/// Unserialize a camera instance from a binary data stream
-		ProjectiveEmitter(Stream *stream, InstanceManager *manager);
+    MTS_DECLARE_CLASS()
+protected:
+    /// Construct a new camera instance
+    ProjectiveEmitter(const Properties &props);
 
-		/// Virtual destructor
-		virtual ~ProjectiveEmitter();
-	protected:
-		Float m_aspect;
-		Vector2 m_resolution;
-		Vector2 m_invResolution;
-		Float m_nearClip;
-		Float m_farClip;
-		Float m_focusDistance;
-		fs::path m_filename;
-		MIPMap *m_mipmap;
-		Vector2i m_size;
-		float m_normalSpectrum;
-		float *m_cdfRows, *m_cdfCols;
-		Float *m_rowWeights;
+    /// Unserialize a camera instance from a binary data stream
+    ProjectiveEmitter(Stream *stream, InstanceManager *manager);
+
+    /// Virtual destructor
+    virtual ~ProjectiveEmitter();
+
+protected:
+    Float m_aspect;
+    Vector2 m_resolution;
+    Vector2 m_invResolution;
+    Float m_nearClip;
+    Float m_farClip;
+    Float m_focusDistance;
+    fs::path m_filename;
+    MIPMap *m_mipmap;
+    Vector2i m_size;
+    float m_normalSpectrum;
+    float *m_cdfRows, *m_cdfCols;
+    Point *m_epilines;
+    Float *m_rowWeights;
     int32_t m_rowTransform;
-		int32_t m_colTransform;
-	};
+    int32_t m_colTransform;
+};
 
 /**
  * \brief Perspective camera interface
@@ -797,52 +832,59 @@ protected:
  * \ingroup librender
  */
 class MTS_EXPORT_RENDER PerspectiveEmitter : public ProjectiveEmitter {
-	public:
-		// =============================================================
-		//! @{ \name Field of view-related
-		// =============================================================
+public:
+    // =============================================================
+    //! @{ \name Field of view-related
+    // =============================================================
 
-		/// Return the horizontal field of view in degrees
-		inline Float getXFov() const { return m_xfov; }
+    /// Return the horizontal field of view in degrees
+    inline Float getXFov() const { return m_xfov; }
 
-		/// Set the horizontal field of view in degrees
-		void setXFov(Float xfov);
+    /// Set the horizontal field of view in degrees
+    void setXFov(Float xfov);
 
-		/// Return the vertical field of view in degrees
-		Float getYFov() const;
+    /// Return the vertical field of view in degrees
+    Float getYFov() const;
 
-		/// Set the vertical field of view in degrees
-		void setYFov(Float yfov);
+    /// Set the vertical field of view in degrees
+    void setYFov(Float yfov);
 
-		/// Return the diagonal field of view in degrees
-		Float getDiagonalFov() const;
+    /// Return the diagonal field of view in degrees
+    Float getDiagonalFov() const;
 
-		/// Set the diagonal field of view in degrees
-		void setDiagonalFov(Float dfov);
+    /// Set the diagonal field of view in degrees
+    void setDiagonalFov(Float dfov);
 
-		//! @}
-		// =============================================================
+    // =============================================================
+    //! @{ \name Probing Configuration interface
+    // =============================================================
 
-		/** \brief Configure the object (called \a once after construction
-           and addition of all child \ref ConfigurableObject instances). */
-		virtual void configure();
+    void configureProbe(Stream *stream) const;
 
-		/// Serialize this camera to a binary data stream
-		virtual void serialize(Stream *stream, InstanceManager *manager) const;
+    //! @}
+    // =============================================================
 
-		MTS_DECLARE_CLASS()
-	protected:
-		/// Construct a new perspective camera instance
-		PerspectiveEmitter(const Properties &props);
+    /** \brief Configure the object (called \a once after construction
+       and addition of all child \ref ConfigurableObject instances). */
+    virtual void configure();
 
-		/// Unserialize a perspective camera instance from a binary data stream
-		PerspectiveEmitter(Stream *stream, InstanceManager *manager);
+    /// Serialize this camera to a binary data stream
+    virtual void serialize(Stream *stream, InstanceManager *manager) const;
 
-		/// Virtual destructor
-		virtual ~PerspectiveEmitter();
-	protected:
-		Float m_xfov;
-	};
+    MTS_DECLARE_CLASS()
+protected:
+    /// Construct a new perspective camera instance
+    PerspectiveEmitter(const Properties &props);
+
+    /// Unserialize a perspective camera instance from a binary data stream
+    PerspectiveEmitter(Stream *stream, InstanceManager *manager);
+
+    /// Virtual destructor
+    virtual ~PerspectiveEmitter();
+
+protected:
+    Float m_xfov;
+};
 
 
 MTS_NAMESPACE_END

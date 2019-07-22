@@ -119,10 +119,11 @@ protected:
 private:
 	ref<Scene> m_scene;
 	ref<RenderQueue> m_queue;
-	int m_sceneResID, m_samplerResID, m_sensorResID;
+	int m_sceneResID, m_samplerResID, m_sensorResID, m_probeResID;
 	bool m_ownsSceneResource;
 	bool m_ownsSensorResource;
 	bool m_ownsSamplerResource;
+	bool m_ownsProbeResource;
 	bool m_cancelled;
 	bool m_interactive;
 };

@@ -33,6 +33,7 @@
 #include <mitsuba/render/medium.h>
 #include <mitsuba/render/volume.h>
 #include <mitsuba/render/phase.h>
+#include <mitsuba/render/probe.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -805,8 +806,8 @@ public:
 	 *    This accounts for the difference in the spatial part of the
 	 *    emission profile and the density function.
 	 */
-	Spectrum sampleProjectiveEmitterPosition(PositionSamplingRecord &pRec,
-								   const Point2 &sample, const Point2* extra) const;
+	Spectrum sampleProjectiveEmitterPosition(PositionSamplingRecord &pRec, Sampler *sampler,
+								   const Point2 &sample, const Point2* extra = NULL) const;
 
 	/**
 	 * \brief Sample a position on the main sensor of the scene.
@@ -836,6 +837,8 @@ public:
 	inline Spectrum sampleSensorPosition(PositionSamplingRecord &pRec,
 		const Point2 &sample, const Point2 *extra = NULL) const {
 		pRec.object = m_sensor.get();
+		if(m_probe != NULL)
+			return m_probe->sampleCameraPosition(pRec, sample, extra);
 		return m_sensor->samplePosition(pRec, sample, extra);
 	}
 
@@ -862,6 +865,8 @@ public:
 	 *    The area density at the supplied position
 	 */
 	inline Float pdfSensorPosition(const PositionSamplingRecord &pRec) const {
+		if(m_probe != NULL)
+			return m_probe->pdfCameraPosition(pRec);
 		return m_sensor->pdfPosition(pRec);
 	}
 
@@ -1144,6 +1149,12 @@ public:
 	/// Return the block resolution used to split images into parallel workloads
 	inline uint32_t getBlockSize() const { return m_blockSize; }
 
+	//Set the probing pattern of the integrator
+	inline void setProbe(Probe *probePattern) { m_probe = probePattern; }
+	//Get the probing pattern of the integrator
+	inline Probe *getProbe() { return m_probe; }
+	inline const Probe *getProbe() const { return m_probe.get(); }
+
 	/// Serialize the whole scene to a network/file stream
 	void serialize(Stream *stream, InstanceManager *manager) const;
 
@@ -1170,6 +1181,7 @@ protected:
 private:
 	ref<ShapeKDTree> m_kdtree;
 	ref<Sensor> m_sensor;
+	ref<Probe> m_probe;
 	ref<Integrator> m_integrator;
 	ref<Sampler> m_sampler;
 	ref<Emitter> m_environmentEmitter;
