@@ -118,7 +118,7 @@ For example application of this plugin, you can look into the file `examples/cor
 ### "filename" parameter is required for all plugins above, so please make sure to always include it scene files for using projectors or coded cameras. 
 
 ### Light Transport Probing
-Three kinds of probing "identity", "row" and "column" are available and they **work only when using bdpt integrator and perspective projector**.
+Three kinds of probing plugins "identity", "row", "column" and "epipolar" are available and they **work only when using bdpt integrator, perspective camera and perspective projector**. All these four probing plugins are subclass of class `Probe`. You can implement your own probing plugins inside the `src/probe` directory in similar ways of implementing other plugins for Mitsuba as mentioned in their documentation.
 
 **Identity Probing**: In this plugin, we limit each perspective camera's pixel denoted (i,j) to evaluate light paths originated from only one pixel(i+a,j+b) on the projector that has displacement(a,b) from the camera's pixel position(i,j).
 
@@ -173,7 +173,7 @@ Besides, you need to set the probe type to be `column` and `disparity` as follow
 The displacement in x dimension between projector and the camera is by default 0, when you ignore explicitly the y value of disparity like `<probe type="column"/>`.
 
 
-**epipolar Probing**: This plugin evaluates only light paths whose perspective camera and perspective projector's samples are on a same plane with origins of the camera and the projector.
+**Epipolar Probing**: This plugin evaluates only light paths whose perspective camera and perspective projector's samples are on a same plane with origins of the camera and the projector.
 
 When using epipolar probing, you must contain exactly one perspective projector and exactly one perspective camera in the scene. Also, you need to set the integrator to be `bdpt` and turn off both `lightImage` and `sampleDirect` as below:
 ```
