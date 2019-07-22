@@ -33,23 +33,24 @@ void PathVertex::makeEndpoint(const Scene *scene, Float time, ETransportMode mod
 }
 
 bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
-		const PathVertex *pred, const PathEdge *predEdge,
-		PathEdge *succEdge, PathVertex *succ,
-		ETransportMode mode, bool russianRoulette, Spectrum *throughput) {
-	Ray ray;
+							 const PathVertex *pred, const PathEdge *predEdge,
+							 PathEdge *succEdge, PathVertex *succ,
+							 ETransportMode mode, bool russianRoulette, Spectrum *throughput, uint32_t probeType) {
+		Ray ray;
 
-	memset(succEdge, 0, sizeof(PathEdge));
-	memset(succ, 0, sizeof(PathVertex));
+		memset(succEdge, 0, sizeof(PathEdge));
+		memset(succ, 0, sizeof(PathVertex));
 
-	succEdge->medium = (predEdge == NULL) ? NULL : predEdge->medium;
-	rrWeight = 1.0f;
+		succEdge->medium = (predEdge == NULL) ? NULL : predEdge->medium;
+		rrWeight = 1.0f;
 
-	switch (type) {
-		case EEmitterSupernode: {
+		switch (type) {
+			case EEmitterSupernode: {
 				BDAssert(mode == EImportance && pred == NULL && predEdge == NULL);
 				PositionSamplingRecord &pRec = succ->getPositionSamplingRecord();
 				const EndpointRecord &eRec = getEndpointRecord();
 				pRec = PositionSamplingRecord(eRec.time);
+				pRec.probeType = probeType;
 				Spectrum result = scene->sampleEmitterPosition(pRec, sampler->next2D());
 				if (result.isZero())
 					return false;
@@ -67,13 +68,14 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 
 				return true;
 			}
-			break;
+				break;
 
-		case ESensorSupernode: {
+			case ESensorSupernode: {
 				BDAssert(mode == ERadiance && pred == NULL && predEdge == NULL);
 				PositionSamplingRecord &pRec = succ->getPositionSamplingRecord();
 				const EndpointRecord &eRec = getEndpointRecord();
 				pRec = PositionSamplingRecord(eRec.time);
+        pRec.probeType = probeType;
 				Spectrum result = scene->sampleSensorPosition(pRec, sampler->next2D());
 				if (result.isZero())
 					return false;
@@ -84,7 +86,7 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 				measure = pRec.measure;
 				succ->type = ESensorSample;
 				succ->degenerate = sensor->getType()
-					& Sensor::EDeltaDirection;
+								   & Sensor::EDeltaDirection;
 
 				succEdge->weight[ERadiance] = Spectrum(1.0f);
 				succEdge->pdf[ERadiance] = 1.0f;
@@ -92,23 +94,23 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 
 				return true;
 			}
-			break;
+				break;
 
-		case EEmitterSample: {
+			case EEmitterSample: {
 				BDAssert(mode == EImportance && pred->type == EEmitterSupernode);
 				PositionSamplingRecord &pRec = getPositionSamplingRecord();
 				const Emitter *emitter = static_cast<const Emitter *>(pRec.object);
 				DirectionSamplingRecord dRec;
 
 				Spectrum result = emitter->sampleDirection(dRec, pRec,
-					emitter->needsDirectionSample() ? sampler->next2D() : Point2(0.5f));
+														   emitter->needsDirectionSample() ? sampler->next2D() : Point2(0.5f));
 
 				if (result.isZero())
 					return false;
 
 				weight[EImportance] = result;
 				weight[ERadiance]   = result * dRec.pdf * (
-					emitter->isOnSurface() ? 1.0f / absDot(dRec.d, pRec.n) : 1.0f);
+						emitter->isOnSurface() ? 1.0f / absDot(dRec.d, pRec.n) : 1.0f);
 				pdf[EImportance]    = dRec.pdf;
 				pdf[ERadiance]      = 1.0f;
 
@@ -118,22 +120,22 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 				ray.setOrigin(pRec.p);
 				ray.setDirection(dRec.d);
 			}
-			break;
+				break;
 
-		case ESensorSample: {
+			case ESensorSample: {
 				BDAssert(mode == ERadiance && pred->type == ESensorSupernode);
 				PositionSamplingRecord &pRec = getPositionSamplingRecord();
 				const Sensor *sensor = static_cast<const Sensor *>(pRec.object);
 				DirectionSamplingRecord dRec;
 
 				Spectrum result = sensor->sampleDirection(dRec, pRec,
-					sensor->needsDirectionSample() ? sampler->next2D() : Point2(0.5f));
+														  sensor->needsDirectionSample() ? sampler->next2D() : Point2(0.5f));
 
 				if (result.isZero())
 					return false;
 
 				weight[EImportance] = result * dRec.pdf * (
-					sensor->isOnSurface() ? 1.0f / absDot(dRec.d, pRec.n) : 1.0f);
+						sensor->isOnSurface() ? 1.0f / absDot(dRec.d, pRec.n) : 1.0f);
 				weight[ERadiance]   = result;
 				pdf[EImportance]    = 1.0f;
 				pdf[ERadiance]      = dRec.pdf;
@@ -144,9 +146,9 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 				ray.setOrigin(pRec.p);
 				ray.setDirection(dRec.d);
 			}
-			break;
+				break;
 
-		case ESurfaceInteraction: {
+			case ESurfaceInteraction: {
 				const Intersection &its = getIntersection();
 				const BSDF *bsdf = its.getBSDF();
 				Vector wi = normalize(pred->getPosition() - its.p);
@@ -166,7 +168,7 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 
 				/* Prevent light leaks due to the use of shading normals */
 				Float wiDotGeoN = dot(its.geoFrame.n, wi),
-				      woDotGeoN = dot(its.geoFrame.n, wo);
+						woDotGeoN = dot(its.geoFrame.n, wo);
 				if (wiDotGeoN * Frame::cosTheta(bRec.wi) <= 0 ||
 					woDotGeoN * Frame::cosTheta(bRec.wo) <= 0)
 					return false;
@@ -175,14 +177,14 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 				if (its.isMediumTransition()) {
 					const Medium *expected = its.getTargetMedium(wi);
 					if (expected != predEdge->medium) {
-						#if defined(MTS_BD_TRACE)
-							SLog(EWarn, "Detected an inconsistency: approached "
+#if defined(MTS_BD_TRACE)
+						SLog(EWarn, "Detected an inconsistency: approached "
 								"surface %s within medium %s, but the surface "
 								"states that the ray should have been in medium %s.",
 								its.toString().c_str(), predEdge->medium ?
 								predEdge->medium->toString().c_str() : "null",
 								expected ? expected->toString().c_str() : "null");
-						#endif
+#endif
 						++mediumInconsistencies;
 						return false;
 					}
@@ -203,7 +205,7 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 					weight[1-mode] = weight[mode] * (pdf[mode] / pdf[1-mode]);
 					if (measure == ESolidAngle)
 						weight[1-mode] *=
-							std::abs(Frame::cosTheta(bRec.wo) / Frame::cosTheta(bRec.wi));
+								std::abs(Frame::cosTheta(bRec.wo) / Frame::cosTheta(bRec.wi));
 				} else {
 					weight[1-mode] = bsdf->eval(bRec, (EMeasure) measure) / pdf[1-mode];
 				}
@@ -212,12 +214,12 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 				/* Adjoint BSDF for shading normals */
 				if (mode == EImportance)
 					weight[EImportance] *= std::abs(
-						(Frame::cosTheta(bRec.wi) * woDotGeoN) /
-						(Frame::cosTheta(bRec.wo) * wiDotGeoN));
+							(Frame::cosTheta(bRec.wi) * woDotGeoN) /
+							(Frame::cosTheta(bRec.wo) * wiDotGeoN));
 				else
 					weight[EImportance] *= std::abs(
-						(Frame::cosTheta(bRec.wo) * wiDotGeoN) /
-						(Frame::cosTheta(bRec.wi) * woDotGeoN));
+							(Frame::cosTheta(bRec.wo) * wiDotGeoN) /
+							(Frame::cosTheta(bRec.wi) * woDotGeoN));
 
 				/// For BDPT & russian roulette, track radiance * eta^2
 				if (throughput && mode == ERadiance && bRec.eta != 1)
@@ -227,9 +229,9 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 				ray.setOrigin(its.p);
 				ray.setDirection(wo);
 			}
-			break;
+				break;
 
-		case EMediumInteraction: {
+			case EMediumInteraction: {
 				const MediumSamplingRecord &mRec = getMediumSamplingRecord();
 				const PhaseFunction *phase = succEdge->medium->getPhaseFunction();
 				Vector wi = normalize(pred->getPosition() - mRec.p);
@@ -255,62 +257,62 @@ bool PathVertex::sampleNext(const Scene *scene, Sampler *sampler,
 					weight[1-mode] = mRec.sigmaS * (phase->eval(pRec) / pdf[1-mode]);
 				}
 			}
-			break;
+				break;
 
-		default:
-			SLog(EError, "PathVertex::sampleNext(): Encountered an "
-				"unsupported vertex type (%i)!", type);
-			return false;
-	}
-
-	if (throughput) {
-		/* For BDPT: keep track of the path throughput to run russian roulette */
-		(*throughput) *= weight[mode];
-
-		if (russianRoulette) {
-			Float q = std::min(throughput->max(), (Float) 0.95f);
-
-			if (sampler->next1D() > q) {
-				measure = EInvalidMeasure;
+			default:
+				SLog(EError, "PathVertex::sampleNext(): Encountered an "
+						"unsupported vertex type (%i)!", type);
 				return false;
-			} else {
-				rrWeight = 1.0f / q;
-				(*throughput) *= rrWeight;
+		}
+
+		if (throughput) {
+			/* For BDPT: keep track of the path throughput to run russian roulette */
+			(*throughput) *= weight[mode];
+
+			if (russianRoulette) {
+				Float q = std::min(throughput->max(), (Float) 0.95f);
+
+				if (sampler->next1D() > q) {
+					measure = EInvalidMeasure;
+					return false;
+				} else {
+					rrWeight = 1.0f / q;
+					(*throughput) *= rrWeight;
+				}
 			}
 		}
-	}
 
-	if (!succEdge->sampleNext(scene, sampler, this, ray, succ, mode)) {
-		/* Sampling a successor edge + vertex failed, hence the vertex
-		   is not committed to a particular measure yet -- revert. */
-		measure = EInvalidMeasure;
-		return false;
-	} else {
-		if (throughput)
-			(*throughput) *= succEdge->weight[mode];
-	}
-
-	/* Convert from solid angle to area measure */
-	if (measure == ESolidAngle) {
-		measure = EArea;
-
-		pdf[mode] /= succEdge->length * succEdge->length;
-		if (succ->isOnSurface())
-			pdf[mode] *= absDot(ray.d, succ->getGeometricNormal());
-
-		if (predEdge->length != 0.0f) {
-			pdf[1-mode] /= predEdge->length * predEdge->length;
-			if (pred->isOnSurface())
-				pdf[1-mode] *= absDot(predEdge->d, pred->getGeometricNormal());
+		if (!succEdge->sampleNext(scene, sampler, this, ray, succ, mode)) {
+			/* Sampling a successor edge + vertex failed, hence the vertex
+               is not committed to a particular measure yet -- revert. */
+			measure = EInvalidMeasure;
+			return false;
+		} else {
+			if (throughput)
+				(*throughput) *= succEdge->weight[mode];
 		}
-	}
 
-	return true;
-}
+		/* Convert from solid angle to area measure */
+		if (measure == ESolidAngle) {
+			measure = EArea;
+
+			pdf[mode] /= succEdge->length * succEdge->length;
+			if (succ->isOnSurface())
+				pdf[mode] *= absDot(ray.d, succ->getGeometricNormal());
+
+			if (predEdge->length != 0.0f) {
+				pdf[1-mode] /= predEdge->length * predEdge->length;
+				if (pred->isOnSurface())
+					pdf[1-mode] *= absDot(predEdge->d, pred->getGeometricNormal());
+			}
+		}
+
+		return true;
+	}
 
 int PathVertex::sampleSensor(const Scene *scene, Sampler *sampler,
 		const Point2i &pixelPosition_, PathEdge *e0, PathVertex *v1,
-		PathEdge *e1, PathVertex *v2) {
+		PathEdge *e1, PathVertex *v2, uint32_t probeType) {
 	BDAssert(type == ESensorSupernode);
 	const EndpointRecord &eRec = getEndpointRecord();
 	const Sensor *sensor = scene->getSensor();
@@ -324,19 +326,25 @@ int PathVertex::sampleSensor(const Scene *scene, Sampler *sampler,
 
 	PositionSamplingRecord &pRec = v1->getPositionSamplingRecord();
 	pRec = PositionSamplingRecord(eRec.time);
+
+	//Pass type to the sensor
+	pRec.probeType = probeType;
+
 	Spectrum result = scene->sampleSensorPosition(pRec,
 		(sensor->getType() & Sensor::EPositionSampleMapsToPixels) ? pixelSample
 		: apertureSample, &pixelPosition);
 
-	if (result.isZero())
-		return 0;
+	//Changed to make bdpt coded camera able to have zero value ray
+	if (result.isZero() && !(sensor->getType() & Sensor::ECodedOrtho)){
+        return 0;
+    }
 
 	weight[ERadiance] = result;
 	pdf[ERadiance] = pRec.pdf;
 	measure = pRec.measure;
 	rrWeight = 1.0f;
 	v1->type = ESensorSample;
-	v1->degenerate = sensor->getType() & Sensor::EDeltaDirection;
+  v1->degenerate = sensor->getType() & Sensor::EDeltaDirection;
 
 	e0->weight[ERadiance] = Spectrum(1.0f);
 	e0->pdf[ERadiance] = 1.0f;
@@ -351,13 +359,13 @@ int PathVertex::sampleSensor(const Scene *scene, Sampler *sampler,
 
 	memset(e1, 0, sizeof(PathEdge));
 	memset(v2, 0, sizeof(PathVertex));
-
 	v1->weight[EImportance] = result * dRec.pdf * (
 		sensor->isOnSurface() ? 1.0f / absDot(dRec.d, pRec.n) : 1.0f);
 	v1->weight[ERadiance]   = result;
 	v1->pdf[EImportance]    = 1.0f;
 	v1->pdf[ERadiance]      = dRec.pdf;
 	v1->rrWeight = 1.0f;
+	v1->uv = pRec.uv;
 
 	v1->measure = dRec.measure;
 	e1->medium = sensor->getMedium();
@@ -382,7 +390,108 @@ int PathVertex::sampleSensor(const Scene *scene, Sampler *sampler,
 	return 2;
 }
 
-bool PathVertex::perturbPosition(const Scene *scene, Sampler *sampler, Float stddev) {
+    int PathVertex::sampleEmitterWS(const Scene *scene, Sampler *sampler,
+                                    const Point2i &pixelPosition_, PathEdge *e0, PathVertex *v1,
+                                    PathEdge *e1, PathVertex *v2,Probe::EProbeType probeType) {
+        BDAssert(type == EEmitterSupernode);
+        const EndpointRecord &eRec = getEndpointRecord();
+        Point2 pixelPosition(pixelPosition_);
+
+        memset(e0, 0, sizeof(PathEdge));
+        memset(v1, 0, sizeof(PathVertex));
+
+        Point2 pixelSample = sampler->next2D(),
+               emitterPos = pixelPosition;
+
+        PositionSamplingRecord &pRec = v1->getPositionSamplingRecord();
+        pRec = PositionSamplingRecord(eRec.time);
+
+        //Pass type to the emitter
+        pRec.probeType = probeType;
+        Float newPdf;
+
+        switch(probeType){
+            case Probe::EIDENTITY: {
+                break;
+            }
+            case Probe::EDISPARITY:{
+                break;
+            }
+            case Probe::EROW:{
+                const Vector2i filmsize = scene->getSensor()->getFilm()->getSize();
+                emitterPos.x = (int)std::ceil(filmsize.x * sampler->next1D());
+                emitterPos.y = pixelPosition.y;
+                break;
+            }
+            case Probe::ECOLUMN:{
+                const Vector2i filmsize = scene->getSensor()->getFilm()->getSize();
+                emitterPos.x = pixelPosition.x;
+                emitterPos.y = (int)std::ceil(filmsize.y * sampler->next1D());
+                break;
+            }
+            default:{
+            }
+
+        }
+        Spectrum result = scene->sampleProjectiveEmitterPosition(pRec, pixelSample, &emitterPos);
+
+        if (result.isZero())
+            return 0;
+
+        const ref_vector<Emitter> &emitters = scene->getEmitters();
+        const Emitter *emitter = emitters[0].get();
+
+        weight[EImportance] = result;
+        pdf[EImportance] = pRec.pdf;
+        measure = pRec.measure;
+        rrWeight = 1.0f;
+        v1->type = EEmitterSample;
+        v1->degenerate = emitter->getType() & Emitter::EDeltaDirection;
+
+        e0->weight[EImportance] = Spectrum(1.0f);
+        e0->pdf[EImportance] = 1.0f;
+        e0->medium = emitter->getMedium();
+
+        DirectionSamplingRecord dRec;
+        result = emitter->sampleDirection(dRec, pRec, pixelSample, &emitterPos);
+        if (result.isZero())
+            return 1;
+
+        memset(e1, 0, sizeof(PathEdge));
+        memset(v2, 0, sizeof(PathVertex));
+
+        v1->weight[ERadiance] = result * dRec.pdf * (
+                emitter->isOnSurface() ? 1.0f / absDot(dRec.d, pRec.n) : 1.0f);
+        v1->weight[EImportance]   = result;
+        v1->pdf[ERadiance]    = 1.0f;
+        v1->pdf[EImportance]  = dRec.pdf;
+		    v1->rrWeight = 1.0f;
+        v1->uv = pRec.uv;
+
+        v1->measure = dRec.measure;
+        e1->medium = emitter->getMedium();
+
+        Ray ray;
+        ray.time = pRec.time;
+        ray.setOrigin(pRec.p);
+        ray.setDirection(dRec.d);
+
+        if (!e1->sampleNext(scene, sampler, v1, ray, v2, EImportance)) {
+            v1->measure = EInvalidMeasure;
+            return 1;
+        }
+
+        if (v1->measure == ESolidAngle) {
+            v1->measure = EArea;
+            v1->pdf[EImportance] /= e1->length * e1->length;
+            if (v2->isOnSurface())
+                v1->pdf[EImportance] *= absDot(ray.d, v2->getGeometricNormal());
+        }
+
+        return 2;
+    }
+
+	bool PathVertex::perturbPosition(const Scene *scene, Sampler *sampler, Float stddev) {
 	Point2 step = warp::squareToStdNormal(sampler->next2D()) * stddev;
 	EVertexType type = (EVertexType) this->type;
 	Ray ray;
@@ -677,6 +786,7 @@ bool PathVertex::perturbDirection(const Scene *scene, const PathVertex *pred,
 	return true;
 }
 
+
 bool PathVertex::propagatePerturbation(const Scene *scene, const PathVertex *pred,
 		const PathEdge *predEdge, PathEdge *succEdge, PathVertex *succ,
 		unsigned int componentType_, Float dist, EVertexType desiredType, ETransportMode mode) {
@@ -778,7 +888,7 @@ bool PathVertex::propagatePerturbation(const Scene *scene, const PathVertex *pre
 }
 
 Spectrum PathVertex::eval(const Scene *scene, const PathVertex *pred,
-		const PathVertex *succ, ETransportMode mode, EMeasure measure) const {
+		const PathVertex *succ, ETransportMode mode, EMeasure measure, Probe::EProbeType probe) const {
 	Spectrum result(0.0f);
 	Vector wo(0.0f);
 
@@ -818,8 +928,9 @@ Spectrum PathVertex::eval(const Scene *scene, const PathVertex *pred,
 				DirectionSamplingRecord dRec(wo, measure == EArea ? ESolidAngle : measure);
 				result = emitter->evalDirection(dRec, pRec);
 				Float dp = absDot(pRec.n, wo);
-				if (measure != EDiscrete && dp != 0)
-					result /= dp;
+				if (measure != EDiscrete && dp != 0 && probe!=Probe::EDISPARITY )
+          result /= dp;
+
 			}
 			break;
 
@@ -838,8 +949,9 @@ Spectrum PathVertex::eval(const Scene *scene, const PathVertex *pred,
 				DirectionSamplingRecord dRec(wo, measure == EArea ? ESolidAngle : measure);
 				result = sensor->evalDirection(dRec, pRec);
 				Float dp = absDot(pRec.n, wo);
-				if (measure != EDiscrete && dp != 0)
-					result /= dp;
+			if (measure != EDiscrete && dp != 0 && probe!=Probe::EDISPARITY) {
+        result /= dp;
+      }
 
 				return result;
 			}
@@ -871,14 +983,15 @@ Spectrum PathVertex::eval(const Scene *scene, const PathVertex *pred,
 					woDotGeoN * Frame::cosTheta(bRec.wo) <= 0)
 					return Spectrum(0.0f);
 
-				if (mode == EImportance) {
+			//changed to adapt to disparity camera
+				if (mode == EImportance  && probe!=Probe::EDISPARITY) {
 					/* Adjoint BSDF for shading normals */
 					result *= std::abs(
 						(Frame::cosTheta(bRec.wi) * woDotGeoN) /
 						(Frame::cosTheta(bRec.wo) * wiDotGeoN));
 				}
-
-				if (measure != EDiscrete && Frame::cosTheta(bRec.wo) != 0)
+			//changed to adapt to disparity camera
+				if (measure != EDiscrete && Frame::cosTheta(bRec.wo) != 0  && probe!=Probe::EDISPARITY)
 					result /= std::abs(Frame::cosTheta(bRec.wo));
 			}
 			break;
@@ -1020,8 +1133,74 @@ Float PathVertex::evalPdf(const Scene *scene, const PathVertex *pred,
 	return result;
 }
 
+
 Spectrum PathVertex::sampleDirect(const Scene *scene, Sampler *sampler,
-		PathVertex *endpoint, PathEdge *edge, PathVertex *sample, ETransportMode mode) const {
+        PathVertex *endpoint, PathEdge *edge, PathVertex *sample, ETransportMode mode,
+																	uint32_t probeType) const {
+    if (isDegenerate() || isAbsorbing())
+      return Spectrum(0.0f);
+
+    memset(edge, 0, sizeof(PathEdge));
+    memset(endpoint, 0, sizeof(PathVertex));
+    memset(sample, 0, sizeof(PathVertex));
+
+    bool emitter = (mode == EImportance);
+    DirectSamplingRecord dRec;
+    if (isSurfaceInteraction())
+			dRec = DirectSamplingRecord(getIntersection());
+			//create a directSamplingRecord with intersection as the reference point
+    else
+      dRec = DirectSamplingRecord(getPosition(), getTime());
+    dRec.probeType = probeType;
+
+    Spectrum value;
+    Point2 rsamp(0.5f);
+    if (sampler)
+      rsamp = sampler->next2D();
+
+    if (emitter)
+      value = scene->sampleEmitterDirect(dRec, rsamp, false);
+    else
+      value = scene->sampleSensorDirect(dRec, rsamp, false);
+
+    if (value.isZero())
+      return Spectrum(0.0f);
+
+    const AbstractEmitter *ae = static_cast<const AbstractEmitter *>(dRec.object);
+    bool degenPos = ae->getType() & AbstractEmitter::EDeltaPosition;
+    bool degenDir = ae->getType() & AbstractEmitter::EDeltaDirection;
+
+    endpoint->type = emitter ? EEmitterSupernode : ESensorSupernode;
+    endpoint->measure = degenPos ? EDiscrete : EArea;
+    endpoint->degenerate = degenPos;
+
+    endpoint->getEndpointRecord() = EndpointRecord(dRec.time);
+
+    /* Be resilient to FP issues */
+    if ((dRec.ref - dRec.p).lengthSquared() <= 0)
+      return Spectrum(0.0f);
+
+    edge->medium = ae->getMedium();
+    edge->pdf[mode] = 1.0f;
+    edge->weight[mode] = Spectrum(1.0f);
+
+    sample->type = emitter ? EEmitterSample : ESensorSample;
+    sample->degenerate = degenDir;
+    sample->measure = degenDir ? EDiscrete : EArea;
+    sample->getPositionSamplingRecord() = PositionSamplingRecord(dRec);
+
+    dRec.measure = (EMeasure) endpoint->measure;
+    endpoint->pdf[mode] = emitter ?
+                          scene->pdfEmitterPosition(dRec) :
+                          scene->pdfSensorPosition(dRec);
+    endpoint->weight[mode] = ae->evalPosition(dRec) / endpoint->pdf[mode];
+
+    return value;
+  }
+
+Spectrum PathVertex::sampleDirect(const Scene *scene, Sampler *sampler,
+		PathVertex *endpoint, PathEdge *edge, PathVertex *sample, ETransportMode mode,
+		const Point2 &pixelPosition, uint32_t probeType) const {
 	if (isDegenerate() || isAbsorbing())
 		return Spectrum(0.0f);
 
@@ -1032,9 +1211,11 @@ Spectrum PathVertex::sampleDirect(const Scene *scene, Sampler *sampler,
 	bool emitter = (mode == EImportance);
 	DirectSamplingRecord dRec;
 	if (isSurfaceInteraction())
-		dRec = DirectSamplingRecord(getIntersection());
+		dRec = DirectSamplingRecord(getIntersection(), pixelPosition);
+	  //create a directSamplingRecord with intersection as the reference point
 	else
-		dRec = DirectSamplingRecord(getPosition(), getTime());
+		dRec = DirectSamplingRecord(getPosition(), getTime(), pixelPosition);
+	dRec.probeType = probeType;
 
 	Spectrum value;
 	Point2 rsamp(0.5f);
@@ -1046,6 +1227,7 @@ Spectrum PathVertex::sampleDirect(const Scene *scene, Sampler *sampler,
 	else
 		value = scene->sampleSensorDirect(dRec, rsamp, false);
 
+//	SLog(EWarn, "value is zero");
 	if (value.isZero())
 		return Spectrum(0.0f);
 
@@ -1076,7 +1258,6 @@ Spectrum PathVertex::sampleDirect(const Scene *scene, Sampler *sampler,
 	endpoint->pdf[mode] = emitter ?
 		scene->pdfEmitterPosition(dRec) :
 		scene->pdfSensorPosition(dRec);
-
 	endpoint->weight[mode] = ae->evalPosition(dRec) / endpoint->pdf[mode];
 
 	return value;

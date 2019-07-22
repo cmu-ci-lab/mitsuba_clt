@@ -651,6 +651,7 @@ void LocalWorker::run() {
 		try {
 			m_schedItem.wp->process(m_schedItem.workUnit, m_schedItem.workResult, m_schedItem.stop);
 		} catch (const std::exception &ex) {
+			printf("catch exception");
 			m_schedItem.stop = true;
 			releaseWork(m_schedItem);
 			ELogLevel warnLogLevel = Thread::getThread()->getLogger()->getErrorLevel() == EError

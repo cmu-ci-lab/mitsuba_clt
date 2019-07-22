@@ -44,6 +44,7 @@ struct BDPTConfiguration {
 	bool lightImage;
 	bool sampleDirect;
 	bool showWeighted;
+	std::string type;
 	size_t sampleCount;
 	Vector2i cropSize;
 	int rrDepth;
@@ -59,6 +60,7 @@ struct BDPTConfiguration {
 		sampleCount = stream->readSize();
 		cropSize = Vector2i(stream);
 		rrDepth = stream->readInt();
+		type = stream->readString();
 	}
 
 	inline void serialize(Stream *stream) const {
@@ -70,6 +72,7 @@ struct BDPTConfiguration {
 		stream->writeSize(sampleCount);
 		cropSize.serialize(stream);
 		stream->writeInt(rrDepth);
+		stream->writeString(type);
 	}
 
 	void dump() const {

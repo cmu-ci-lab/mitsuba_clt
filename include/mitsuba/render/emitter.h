@@ -770,12 +770,14 @@ protected:
 		Float m_nearClip;
 		Float m_farClip;
 		Float m_focusDistance;
-        fs::path m_filename;
-        MIPMap *m_mipmap;
-        Vector2i m_size;
+		fs::path m_filename;
+		MIPMap *m_mipmap;
+		Vector2i m_size;
 		float m_normalSpectrum;
 		float *m_cdfRows, *m_cdfCols;
 		Float *m_rowWeights;
+    int32_t m_rowTransform;
+		int32_t m_colTransform;
 	};
 
 /**

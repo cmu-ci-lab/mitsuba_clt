@@ -21,6 +21,7 @@
 #define __MITSUBA_RENDER_COMMON_H_
 
 #include <mitsuba/core/ray.h>
+//#include <mitsuba/render/probe.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -112,6 +113,8 @@ public:
 	 */
 	Point2 uv;
 
+  uint32_t probeType = 0x00;
+
 	/**
 	 * \brief Optional: Pointer to an associated object
 	 *
@@ -175,6 +178,10 @@ public:
 
 	/// Measure associated with the density function
 	EMeasure measure;
+
+	/* record the location of the sampling point on the perspective
+ * camera or orthographic camera*/
+	Point2 planePosition;
 
 public:
 	/// Return a human-readable description of the record
@@ -254,6 +261,9 @@ public:
 	/// Distance from the reference point to the target direction
 	Float dist;
 
+	///Space
+	Point2 pixelPosition;
+
 public:
 	/// Create an invalid direct sampling record
 	inline DirectSamplingRecord() { }
@@ -271,6 +281,18 @@ public:
 		: PositionSamplingRecord(time), ref(ref), refN(0.0f) { }
 
 	/**
+* \brief Create an new direct sampling record for a reference point
+* \c ref located somewhere in space (i.e. \a not on a surface)
+*
+* \param ref
+*     The reference point
+* \param time
+*     An associated time value
+*/
+	inline DirectSamplingRecord(const Point &ref, Float time, const Point2& samplePosition)
+					: PositionSamplingRecord(time), ref(ref), refN(0.0f), pixelPosition(samplePosition){ }
+
+	/**
 	 * \brief Create an new direct sampling record for a reference point
 	 * \c ref located on a surface.
 	 *
@@ -278,6 +300,15 @@ public:
 	 *     The reference point specified using an intersection record
 	 */
 	inline DirectSamplingRecord(const Intersection &refIts);
+
+	/**
+ 	* \brief Create an new direct sampling record for a reference point
+ 	* \c ref located on a surface.
+ 	*
+ 	* \param its
+ 	*     The reference point specified using an intersection record
+ 	*/
+	inline DirectSamplingRecord(const Intersection &refIts, const Point2 &pixelPoisition);
 
 	/**
 	 * \brief Create an new direct sampling record for a reference point

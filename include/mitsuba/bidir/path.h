@@ -23,6 +23,7 @@
 #include <mitsuba/bidir/vertex.h>
 #include <mitsuba/bidir/edge.h>
 #include <mitsuba/bidir/mempool.h>
+#include <mitsuba/bidir/probe.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -175,6 +176,14 @@ public:
 		Sampler *sampler, Path &emitterPath, int nEmitterSteps,
 		Path &sensorPath, int nSensorSteps, const Point2i &pixelPosition,
 		int rrStart, MemoryPool &pool);
+
+	/*
+	 * Added sensor and emitter path generation for probing
+	 */
+	static std::pair<int, int> alternatingRandomWalkforProbing(const Scene *scene,
+															  Sampler *sampler, Path &emitterPath, int nEmitterSteps,
+															  Path &sensorPath, int nSensorSteps, const Point2i &pixelPosition,
+															  int rrStart, MemoryPool &pool, Probe::EProbeType probeType);
 
 	/**
 	 * \brief Verify the cached values stored in this path
@@ -417,7 +426,7 @@ public:
 			const Path &emitterSubpath,
 			const PathEdge *connectionEdge,
 			const Path &sensorSubpath, int s, int t,
-			bool direct, bool lightImage);
+			bool direct, bool lightImage, Probe::EProbeType probetype = Probe::ENORMAL);
 
 	/**
 	 * \brief Collapse a path into an entire edge that summarizes the aggregate

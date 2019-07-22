@@ -20,6 +20,7 @@
 #include <mitsuba/render/medium.h>
 #include <mitsuba/core/track.h>
 #include <mitsuba/core/frame.h>
+#include <mitsuba/bidir/probe.h>
 
 MTS_NAMESPACE_BEGIN
 
@@ -345,6 +346,8 @@ public:
 		dRec.d = trafo(d);
 		dRec.measure = ESolidAngle;
 		dRec.pdf = m_normalization / (d.z * d.z * d.z);
+//		std::string str = "cam" + (*extra).toString() + pRec.uv.toString();
+//		std::cout<<str<<endl;
 
 		return Spectrum(1.0f);
 	}
@@ -411,6 +414,21 @@ public:
 
 		dRec.uv.x *= m_resolution.x;
 		dRec.uv.y *= m_resolution.y;
+//		SLog(EWarn, "%d",dRec.probeType);
+
+		if((dRec.probeType==Probe::ECOLUMN) && floor(dRec.uv.x) != floor(dRec.pixelPosition.x)) {
+			dRec.pdf = 0;
+			return Spectrum(0.0f);
+		}
+		else if((dRec.probeType==Probe::EROW) && floor(dRec.uv.y) != floor(dRec.pixelPosition.y)) {
+			dRec.pdf = 0;
+			return Spectrum(0.0f);
+		}
+		else if((dRec.probeType==Probe::EIDENTITY) && (floor(dRec.uv.x) != floor(dRec.pixelPosition.x)
+						|| floor(dRec.uv.y) != floor(dRec.pixelPosition.y))) {
+			dRec.pdf = 0;
+			return Spectrum(0.0f);
+		}
 
 		Vector localD(refP);
 		Float dist = localD.length(),

@@ -266,8 +266,6 @@ MTS_NAMESPACE_BEGIN
                 return Spectrum(0.0f);
             }
 
-            Point2 uv(sample.x,sample.y);
-
             dRec.p = trafo.transformAffine(Point(localP.x, localP.y, 0.0f));
             dRec.n /= scale;
             dRec.d = -dRec.n;
