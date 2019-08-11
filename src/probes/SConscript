@@ -1,7 +1,7 @@
 Import('env', 'plugins')
 
 plugins += env.SharedLibrary('identity', ['identityProbing.cpp'])
-plugins += env.SharedLibrary('column', ['columnProbing.cpp'])
+plugins += env.SharedLibrary('column', ['ColumnProbing.cpp'])
 plugins += env.SharedLibrary('row', ['rowProbing.cpp'])
 plugins += env.SharedLibrary('epipolar', ['epipolarProbing.cpp'])
 
