@@ -1,9 +1,9 @@
 # Mitsuba CLT
 Mitsuba CLT extends the functionality of the [Mitsuba renderer](https://www.mitsuba-renderer.org/) (v0.5.0) by adding extensions for easier simulation of computational light transport imaging systems.
 
-Currently implemented extensions include: perspective projector, orthographic projector, coded perspective camera and coded orthographic camera. 
+Currently implemented extensions include: perspective projector, orthographic projector, coded perspective camera, coded orthographic camera, row probing, column probing, identity probing and epipolar probing.
 
-## Gompiling the extended renderer
+## Compiling the extended renderer
 
 To compile Mitsuba CLT, you need to follow build instructions inside [Mitsuba documentation](https://www.mitsuba-renderer.org/releases/current/documentation.pdf), yet at the step of 
 ```
@@ -17,6 +17,8 @@ git clone https://github.com/cmu-ci-lab/mitsuba_clt.git
 ## Basic usage
 
 To use basic rendering functionality of Mitsuba, you can look into [Mitsuba documentation](https://www.mitsuba-renderer.org/releases/current/documentation.pdf). For the extended functionalities, you can consult below instructions to use projectors and coded cameras in the scene. You can also find some example scene files for using extended functionalities (modified from original Mitsuba sample scene files) in the examples/ directory.  
+
+Also, you can run this renderer on AWS using the pre-configured AMI with ID ami-09e816d8b71f99121 (N. Virginia US EAST) or ami-0d9bb11ea1c00ab97 (Ohio US EAST). This AMI is compatible with CfnCluster for easy distributed rendering.
 
 **Note that to use new projector plugins with bidirectional path tracing, it is necessary to disable the lightImage option.** Below is an example of doing this,
 ```
